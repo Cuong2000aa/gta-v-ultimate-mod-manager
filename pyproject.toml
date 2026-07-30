@@ -1,0 +1,81 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gta-mod-manager"
+version = "3.0.0"
+description = "GTA V Ultimate Mod Manager - a safety-first, plugin-based mod manager for Grand Theft Auto V"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Ultimate Mod Tools" }]
+keywords = ["gta5", "mods", "mod-manager", "openiv", "pyside6"]
+
+dependencies = [
+    "PySide6>=6.6",
+    "py7zr>=0.20",
+    "rarfile>=4.1",
+    "lxml>=5.0",
+    "pefile>=2023.2.7",
+    "vdf>=3.4",
+    "fivefury>=0.2.11",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "pytest-qt>=4.4",
+    "mypy>=1.10",
+    "ruff>=0.5",
+    "pyinstaller>=6.0",
+]
+
+[project.scripts]
+gta-mod-manager = "gta_mod_manager.app:main"
+
+[tool.setuptools.packages.find]
+include = ["gta_mod_manager*"]
+
+[tool.setuptools.package-data]
+"gta_mod_manager.gui.theme" = ["*.qss"]
+"gta_mod_manager.resources" = ["**/*"]
+"gta_mod_manager.resources.graphics" = ["**/*"]
+"gta_mod_manager.resources.graphics.cuongvision" = ["**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = ["ignore::DeprecationWarning"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ANN", "D"]
+# D107: constructor arguments are documented in the class docstring, as the
+# Google style guide prescribes.
+ignore = ["D107"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D", "ANN"]
+# ANN401: JSON documents, DI factories and exception context are dynamically
+# typed by nature; narrowing them would only push `Any` to the call sites.
+"gta_mod_manager/core/container.py" = ["ANN401"]
+"gta_mod_manager/core/exceptions.py" = ["ANN401"]
+"gta_mod_manager/repository/codecs.py" = ["ANN401"]
+"gta_mod_manager/repository/json_store.py" = ["ANN401"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = false
+ignore_missing_imports = true
+# The DI container keys its bindings by abstract type on purpose: the whole
+# point is to bind a port (ABC/Protocol) to a concrete adapter.
+disable_error_code = ["type-abstract"]

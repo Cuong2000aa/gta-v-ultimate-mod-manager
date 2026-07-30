@@ -1,0 +1,427 @@
+"""Use-cases around the library of installed mods."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, replace
+from pathlib import Path
+
+from gta_mod_manager.core.events import (
+    EventBus,
+    ModLibraryChangedEvent,
+    NotificationEvent,
+    NotificationLevel,
+    new_operation_id,
+)
+from gta_mod_manager.core.exceptions import InstallError, UninstallError
+from gta_mod_manager.core.logging_setup import get_logger
+from gta_mod_manager.core.progress import NullProgressReporter
+from gta_mod_manager.core.protocols import ProgressReporter
+from gta_mod_manager.core.result import Result
+from gta_mod_manager.installer.uninstaller import Uninstaller, UninstallOutcome
+from gta_mod_manager.models.backup_snapshot import OperationRecord
+from gta_mod_manager.models.enums import ModStatus, OperationKind, OperationStatus
+from gta_mod_manager.models.game_install import GameInstall
+from gta_mod_manager.models.mod_package import InstalledFileRecord, InstalledMod
+from gta_mod_manager.plugins.gta_v.addon_peds import (
+    PED_META_MEMBER_PREFIX,
+    remove_addon_peds,
+)
+from gta_mod_manager.plugins.gta_v.rpf_archive import (
+    remove_dlclist_entries,
+    restore_stock_members,
+    stock_archive_for_mods_copy,
+)
+from gta_mod_manager.repository.backup_repository import JsonBackupRepository
+from gta_mod_manager.repository.mod_repository import JsonModRepository
+from gta_mod_manager.services.backup_service import BackupService
+from gta_mod_manager.utils import fs
+
+_LOGGER = get_logger("services.library")
+
+
+@dataclass(frozen=True, slots=True)
+class ModSummary:
+    """An installed mod reduced to what the list view displays."""
+
+    mod: InstalledMod
+    size_label: str
+    is_intact: bool
+
+    @property
+    def mod_id(self) -> str:
+        """Return the mod identifier."""
+        return self.mod.mod_id
+
+    @property
+    def display_name(self) -> str:
+        """Return the mod name."""
+        return self.mod.display_name
+
+
+class LibraryService:
+    """Lists, verifies, disables and removes installed mods."""
+
+    def __init__(
+        self,
+        mods: JsonModRepository,
+        uninstaller: Uninstaller,
+        backups: BackupService,
+        backup_repository: JsonBackupRepository,
+        bus: EventBus,
+    ) -> None:
+        self._mods = mods
+        self._uninstaller = uninstaller
+        self._backups = backups
+        self._backup_repository = backup_repository
+        self._bus = bus
+
+    def list_installed(self, install: GameInstall | None = None) -> tuple[ModSummary, ...]:
+        """Return the installed mods, optionally filtered by installation."""
+        records = (
+            self._mods.list_for_game(install.root_path)
+            if install is not None
+            else self._mods.list_all()
+        )
+        return tuple(self._summarise(record) for record in records)
+
+    def get(self, mod_id: str) -> InstalledMod | None:
+        """Return one installed mod, or ``None`` when unknown."""
+        return self._mods.get(mod_id)
+
+    def search(
+        self, query: str, install: GameInstall | None = None
+    ) -> tuple[ModSummary, ...]:
+        """Return installed mods whose name, kind or spawn code matches ``query``."""
+        needle = query.strip().lower()
+        if not needle:
+            return self.list_installed(install)
+        return tuple(
+            summary
+            for summary in self.list_installed(install)
+            if needle in summary.display_name.lower()
+            or needle in summary.mod.kind.lower()
+            or any(needle in code for code in summary.mod.spawn_codes)
+        )
+
+    def uninstall(
+        self,
+        mod_id: str,
+        *,
+        force: bool = False,
+        backup_first: bool = True,
+        reporter: ProgressReporter | None = None,
+    ) -> Result[int]:
+        """Remove a mod, snapshotting its files first.
+
+        Returns:
+            The number of files that were deleted.
+        """
+        mod = self._mods.get(mod_id)
+        if mod is None:
+            return Result.fail("This mod is not tracked by the library", code="library.unknown")
+
+        operation_id = new_operation_id()
+        record = OperationRecord(
+            operation_id=operation_id,
+            kind=OperationKind.UNINSTALL,
+            status=OperationStatus.RUNNING,
+            description=f"Uninstall {mod.display_name}",
+            mod_id=mod_id,
+        )
+        self._backup_repository.add_operation(record)
+
+        # Shared archives are multi-gigabyte mods copies of an .rpf. Never
+        # snapshot them again on uninstall: either restore stock members (when
+        # other mods still share the file) or restore the install-time backup.
+        shared_files = [item for item in mod.installed_files if item.shared_archive]
+        plain_files = [item for item in mod.installed_files if not item.shared_archive]
+        will_back_up = bool(backup_first and plain_files)
+        total_steps = 1 + int(will_back_up) + int(bool(shared_files))
+
+        reporter = reporter or NullProgressReporter()
+        reporter.start(operation_id, f"Removing {mod.display_name}", total=total_steps)
+        step = 0
+
+        if will_back_up:
+            reporter.advance(
+                operation_id, step, f"Backing up {mod.display_name} before removal"
+            )
+            snapshot = self._backups.snapshot_paths(
+                game_root=mod.game_root,
+                paths=tuple(item.target_path for item in plain_files),
+                reason=f"Before uninstalling {mod.display_name}",
+                mod_id=mod_id,
+                reporter=reporter,
+            )
+            record = replace(record, snapshot_id=snapshot.snapshot_id)
+            step += 1
+
+        members_restored = 0
+        if shared_files:
+            reporter.advance(
+                operation_id, step, "Restoring stock models in the shared archive"
+            )
+        try:
+            shared_warnings, members_restored, archives_restored = (
+                self._restore_shared_archives(mod, reporter)
+            )
+        except InstallError as error:
+            reporter.finish(operation_id, f"Could not remove {mod.display_name}")
+            self._backup_repository.add_operation(
+                record.completed(OperationStatus.FAILED, str(error))
+            )
+            return Result.fail(str(error), code="library.uninstall_failed")
+        if shared_files:
+            step += 1
+
+        removable = replace(mod, installed_files=tuple(plain_files))
+
+        reporter.advance(operation_id, step, "Deleting the files this mod installed")
+        try:
+            if removable.installed_files:
+                outcome = self._uninstaller.uninstall(
+                    removable, force=force, reporter=reporter
+                )
+            else:
+                outcome = UninstallOutcome()
+        except UninstallError as error:
+            reporter.finish(operation_id, f"Could not remove {mod.display_name}")
+            self._backup_repository.add_operation(
+                record.completed(OperationStatus.FAILED, str(error))
+            )
+            return Result.fail(str(error), code="library.uninstall_failed")
+
+        reporter.finish(operation_id, f"Removed {mod.display_name}")
+        self._mods.remove(mod_id)
+        self._backup_repository.add_operation(record.completed(OperationStatus.SUCCEEDED))
+        self._bus.publish(ModLibraryChangedEvent(reason="uninstalled"))
+
+        warnings: list[str] = list(shared_warnings)
+        removed_count = len(outcome.removed) + members_restored + archives_restored
+        if outcome.modified_externally:
+            warnings.append(
+                f"{len(outcome.modified_externally)} file(s) were changed after installation "
+                "and were left in place"
+            )
+            self._bus.publish(
+                NotificationEvent(
+                    title=f"{mod.display_name} removed with warnings",
+                    message=warnings[0],
+                    level=NotificationLevel.WARNING,
+                )
+            )
+        else:
+            detail = f"{len(outcome.removed)} file(s) deleted"
+            if members_restored:
+                detail = (
+                    f"restored {members_restored} stock model(s) in the shared archive"
+                    + (f"; {detail}" if outcome.removed else "")
+                )
+            self._bus.publish(
+                NotificationEvent(
+                    title=f"{mod.display_name} removed",
+                    message=detail,
+                    level=NotificationLevel.SUCCESS,
+                )
+            )
+        return Result(value=removed_count, warnings=tuple(warnings))
+
+    def _restore_shared_archives(
+        self, mod: InstalledMod, reporter: ProgressReporter | None = None
+    ) -> tuple[tuple[str, ...], int, int]:
+        """Undo this mod's edits to shared mods ``.rpf`` archives.
+
+        The edits are always reverted at the *member* level: the mod's DLC
+        ``dlclist`` entries, its add-on ped models and its replaced stream
+        members are removed / restored from the original game archive. This is
+        backup-independent, so it works even though shared archives are no
+        longer full-copied into a snapshot at install time.
+
+        The install-time backup, when it exists (older installs), is used only
+        as a last resort for records that carry no actionable members.
+
+        Returns:
+            ``(warnings, members_restored, archives_restored)``.
+        """
+        shared = [item for item in mod.installed_files if item.shared_archive]
+        if not shared:
+            return (), 0, 0
+
+        warnings: list[str] = []
+        others = [
+            other
+            for other in self._mods.list_for_game(mod.game_root)
+            if other.mod_id != mod.mod_id
+        ]
+        members_restored = 0
+        backup_only_paths: list[Path] = []
+        for record in shared:
+            owners = sorted(
+                {
+                    other.display_name
+                    for other in others
+                    for owned in other.installed_files
+                    if owned.shared_archive
+                    and fs.normalise(owned.target_path)
+                    == fs.normalise(record.target_path)
+                }
+            )
+            restored, note = self._revert_shared_members(record, mod, owners)
+            members_restored += restored
+            if note:
+                warnings.append(note)
+            elif restored == 0:
+                # Nothing member-level to undo; may need the legacy full backup.
+                backup_only_paths.append(record.target_path)
+
+        if not backup_only_paths:
+            return tuple(warnings), members_restored, 0
+
+        archives_restored, backup_warnings = self._restore_from_install_backup(
+            mod, backup_only_paths, reporter
+        )
+        warnings.extend(backup_warnings)
+        return tuple(warnings), members_restored, archives_restored
+
+    def _revert_shared_members(
+        self, record: InstalledFileRecord, mod: InstalledMod, owners: list[str]
+    ) -> tuple[int, str]:
+        """Remove this mod's members from one shared archive.
+
+        Returns ``(members_restored, warning)``. ``warning`` is empty when
+        nothing needed saying.
+        """
+        dlc_packs = tuple(
+            member[len("dlclist:") :]
+            for member in record.archive_members
+            if member.startswith("dlclist:")
+        )
+        ped_stems = tuple(
+            member[len(PED_META_MEMBER_PREFIX) :]
+            for member in record.archive_members
+            if member.startswith(PED_META_MEMBER_PREFIX)
+        )
+        stock_members = tuple(
+            member
+            for member in record.archive_members
+            if not member.startswith("dlclist:")
+            and not member.startswith(PED_META_MEMBER_PREFIX)
+        )
+        shared_suffix = (
+            f"; archive still used by {', '.join(owners)}" if owners else ""
+        )
+
+        restored = 0
+        details: list[str] = []
+        if dlc_packs:
+            removed = remove_dlclist_entries(record.target_path, dlc_packs)
+            restored += removed
+            details.append(f"removed {removed} DLC entry(ies) from dlclist.xml")
+        if ped_stems:
+            removed = remove_addon_peds(record.target_path, ped_stems)
+            restored += removed
+            details.append(f"removed {removed} add-on ped model(s)")
+        if stock_members:
+            stock = stock_archive_for_mods_copy(record.target_path, mod.game_root)
+            outcome = restore_stock_members(
+                record.target_path,
+                stock,
+                stock_members,
+                game_root=mod.game_root,
+            )
+            restored += outcome.changed
+            details.append(
+                f"restored {outcome.restored}, removed {outcome.removed} "
+                f"(OpenIV fallthrough)"
+            )
+
+        if not details:
+            return 0, ""
+        note = f"{'; '.join(details)} in {record.target_path.name}{shared_suffix}"
+        return restored, note
+
+    def _restore_from_install_backup(
+        self,
+        mod: InstalledMod,
+        paths: list[Path],
+        reporter: ProgressReporter | None,
+    ) -> tuple[int, list[str]]:
+        """Legacy fallback: restore whole archives from the install snapshot."""
+        if not mod.backup_id:
+            return 0, [
+                "Shared archive(s) had nothing to undo at the member level and no "
+                "install backup exists; left in place."
+            ]
+        snapshot = self._backup_repository.get_snapshot(mod.backup_id)
+        if snapshot is None:
+            return 0, ["Install backup for shared archive(s) is missing; left in place"]
+
+        wanted = {fs.normalise(path) for path in paths}
+        restored_archives = 0
+        for entry in snapshot.entries:
+            if fs.normalise(entry.original_path) not in wanted:
+                continue
+            self._backups.restore(replace(snapshot, entries=(entry,)), reporter)
+            restored_archives += 1
+        if restored_archives:
+            _LOGGER.info(
+                "Restored %d shared archive(s) from backup for uninstall of %s",
+                restored_archives,
+                mod.display_name,
+            )
+        return restored_archives, []
+
+    def verify(self, mod_id: str) -> Result[tuple[str, ...]]:
+        """Return the files of ``mod_id`` that are missing or were changed."""
+        mod = self._mods.get(mod_id)
+        if mod is None:
+            return Result.fail("This mod is not tracked by the library", code="library.unknown")
+
+        problems: list[str] = []
+        for record in mod.installed_files:
+            if not record.target_path.exists():
+                problems.append(f"missing: {record.target_path}")
+            elif record.sha256 and not self._matches(record.target_path, record.sha256):
+                problems.append(f"changed: {record.target_path}")
+
+        status = ModStatus.BROKEN if problems else ModStatus.INSTALLED
+        if mod.status is not status:
+            self._mods.update_status(mod_id, status)
+            self._bus.publish(ModLibraryChangedEvent(reason="verified"))
+        return Result.ok(tuple(problems))
+
+    def set_enabled(self, mod_id: str, enabled: bool) -> Result[InstalledMod]:
+        """Flag a mod as enabled or disabled in the library.
+
+        Only the record changes; files are not moved. Physically disabling a
+        mod is a separate operation offered through uninstall plus reinstall,
+        which keeps the file bookkeeping honest.
+        """
+        updated = self._mods.update_status(
+            mod_id, ModStatus.INSTALLED if enabled else ModStatus.DISABLED
+        )
+        if updated is None:
+            return Result.fail("This mod is not tracked by the library", code="library.unknown")
+        self._bus.publish(ModLibraryChangedEvent(reason="status"))
+        return Result.ok(updated)
+
+    def _summarise(self, mod: InstalledMod) -> ModSummary:
+        """Build the list-view summary of ``mod``."""
+        total = 0
+        intact = True
+        for record in mod.installed_files:
+            if record.target_path.is_file():
+                total += record.target_path.stat().st_size
+            else:
+                intact = False
+        return ModSummary(mod=mod, size_label=fs.human_size(total), is_intact=intact)
+
+    @staticmethod
+    def _matches(path: Path, expected: str) -> bool:
+        """Return whether the file content still matches ``expected``."""
+        from gta_mod_manager.utils import hashing
+
+        try:
+            return hashing.sha256_file(path) == expected
+        except OSError:
+            return False

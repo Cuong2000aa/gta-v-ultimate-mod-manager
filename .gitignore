@@ -1,0 +1,32 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.idea/
+.vscode/
+.cursor/
+*.log
+*.part
+
+# Runtime working directories (created on demand)
+logs/
+temp/
+backup/
+cache/
+config/*.json
+downloads/
+library/
+
+# Local game/mod payloads must never enter source control
+*.rar
+*.7z
+*.oiv
+*.rpf

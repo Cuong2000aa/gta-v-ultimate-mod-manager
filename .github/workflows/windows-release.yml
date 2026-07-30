@@ -1,0 +1,59 @@
+name: Windows build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Run tests
+        run: python -m pytest
+
+      - name: Build standalone EXE
+        shell: pwsh
+        run: ./tools/build_windows.ps1
+
+      - name: Smoke-test packaged EXE
+        shell: pwsh
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: >
+          ./dist/GtaVUltimateModManager.exe
+          --data-dir "${{ runner.temp }}/gtamm-smoke"
+          --smoke-test
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GtaVUltimateModManager-Windows-x64
+          path: dist/GtaVUltimateModManager.exe
+          if-no-files-found: error
+
+      - name: Publish tagged release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/GtaVUltimateModManager.exe
+          generate_release_notes: true
