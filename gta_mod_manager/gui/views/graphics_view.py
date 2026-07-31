@@ -70,6 +70,10 @@ class GraphicsView(QWidget):
         self._install.clicked.connect(self._vm.install)
         actions.addWidget(self._install)
 
+        self._update_reshade = QPushButton(t("graphics.update_reshade"))
+        self._update_reshade.clicked.connect(self._vm.update_reshade)
+        actions.addWidget(self._update_reshade)
+
         self._uninstall = QPushButton(t("graphics.uninstall"))
         self._uninstall.clicked.connect(self._vm.uninstall)
         actions.addWidget(self._uninstall)
@@ -119,6 +123,7 @@ class GraphicsView(QWidget):
             self._badge_detail.setText(t("graphics.badge_not_installed"))
         self._status.setText(status.message)
         self._install.setEnabled(not status.conflict_enb)
+        self._update_reshade.setEnabled(not status.conflict_enb)
         self._uninstall.setEnabled(status.installed)
 
     def _on_status_line(self, message: str) -> None:
@@ -132,6 +137,7 @@ class GraphicsView(QWidget):
     def _on_busy(self, busy: bool) -> None:
         enabled = not busy
         self._install.setEnabled(enabled)
+        self._update_reshade.setEnabled(enabled)
         self._uninstall.setEnabled(enabled)
         self._install_road_2k.setEnabled(enabled)
         self._uninstall_road_2k.setEnabled(enabled)

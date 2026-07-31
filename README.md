@@ -1,14 +1,14 @@
 # GTA V Ultimate Mod Manager
 
-A safety-first mod manager for *Grand Theft Auto V*, built on Python and PySide6.
-It detects your installation, analyses an archive before touching anything, shows
-you exactly what will be written, and keeps a reversible snapshot of every file
-it replaces.
+A safety-first Story Mode mod manager for *Grand Theft Auto V*, built on Python
+and PySide6. It detects your installation, analyses an archive before touching
+anything, shows exactly what will be written, and keeps a reversible snapshot of
+every file it replaces.
 
 The manager does **not** copy files blindly. Every archive goes through the same
 pipeline: extract into a temporary workspace, build a file inventory, classify
 the mod, resolve dependencies, map every file to a destination, validate the plan
-against the safety rules, and only then write - inside a journalled transaction
+against the safety rules, and only then write — inside a journalled transaction
 that rolls back on the first error.
 
 ## The absolute safety rule
@@ -38,27 +38,31 @@ third-party plugin that builds an unsafe plan cannot get it executed.
 | Area | What it does |
 | --- | --- |
 | Game detection | Registry, Steam (`libraryfolders.vdf`), Epic manifests, Rockstar Launcher and common install folders, plus manual selection with validation |
-| Component detection | Finds ScriptHookV, ScriptHookVDotNet, ASI Loader, OpenIV.asi, Packfile Limit Adjuster, Heap Adjuster, gameconfig, LML, NativeUI, Menyoo, ReShade, ENB and reports versions and gaps |
+| Essentials + Stability Kit | Creates `mods/`, auto-installs pinned ScriptHookVDotNet + NativeUI, and opens download pages for ScriptHookV, OpenIV.asi, Packfile Limit Adjuster, Heap Adjuster, and a build-matched gameconfig |
 | Mod analysis | Extracts `zip`, `7z`, `rar` and `oiv`, walks the tree, and classifies the mod with a confidence score and the evidence behind it |
-| Vehicle support | Parses `vehicles.meta`, `handling.meta`, `carcols.meta`, `carvariations.meta`, `content.xml`, `setup2.xml` to recognise replace vs. add-on, spawn codes, manufacturer and DLC packs; repairs malformed XML |
-| OpenIV packages | Reads `package.xml` / `assembly.xml`, installs what it safely can, and lists the remaining steps as explicit manual instructions |
-| Conflict detection | Duplicate spawn codes, DLC packs, handling ids, textures, packfiles, a second `gameconfig.xml`, overwritten files with the owning mod named, and missing dependencies |
+| Vehicle / weapon / map packs | Recognises replace vs add-on DLC, spawn codes, and common meta; registers add-on packs in `dlclist` when safe |
+| Physical enable / disable | Quarantines loose files and reverts shared archive members; re-enable restores loose files and re-applies cached RPF payloads when available |
+| Conflict Center | Audits duplicate spawn codes, DLC packs, shared files and gameconfigs; one-click disable for conflicting mods |
 | Backup and restore | Snapshot per installation, undo, restore, delete, and pruning by generation count |
-| Uninstall | Removes exactly the files the installation recorded, then the directories it created |
-| NCCVision Ultimate | One depth-free cinematic ReShade profile with filmic teal/orange grade, soft bloom, color-edge SMAA, AMD CAS, and an optional verified 2K road download |
+| Online Mods | Browse / search GTA5-Mods and Nexus (API key optional), then hand off to the same safe install pipeline |
+| Spawn Center | Lists spawn codes from installed vehicle / ped mods for trainers |
+| NCCVision Ultimate | Depth-free cinematic ReShade profile (lighter filmic grade + scene micro-detail, color-edge SMAA, AMD CAS), optional verified 2K roads, and in-app **Update ReShade** from reshade.me |
+| Zombie Mode | Managed install of pinned Simple Zombies Reborn (SHA-256 verified) with dependency checks |
+| Game Diagnostics | Crash / log / ASI / ENB leftover / orphan DLC / vehicle stream checks with one-click repairs where safe |
 | Plugin system | Game-specific knowledge lives in a plugin; the core knows nothing about GTA V |
 
 ## Requirements
 
 - Windows 10 or 11 (the detector and root-policy logic are Windows-specific)
 - The packaged EXE includes Python; Python 3.11+ is only required for source development
-- Optional: 7-Zip / WinRAR on `PATH` or configured in Settings, for `.rar` archives
+- **7-Zip** on `PATH` or configured in Settings — needed for many `.rar` / `.7z` archives and for **Update ReShade**
 - OpenIV.asi in the game root (required for mods-folder archive overrides)
+- Story Mode / single-player only — never enter GTA Online with script mods loaded
 
 ## Windows download
 
-Download `GtaVUltimateModManager.exe` from the latest GitHub Actions artifact
-or tagged GitHub Release and run it directly. Python and `run.bat` are not
+Download `GtaVUltimateModManager.exe` from the latest [GitHub Release](https://github.com/Cuong2000aa/gta-v-ultimate-mod-manager/releases)
+or GitHub Actions artifact and run it directly. Python and `run.bat` are not
 required for the packaged application.
 
 Windows may show a SmartScreen warning until releases are code-signed. Verify
@@ -67,7 +71,7 @@ that the download came from this repository before choosing **Run anyway**.
 ## Running from source
 
 ```powershell
-git clone <repository-url> gta-v-ultimate-mod-manager
+git clone https://github.com/Cuong2000aa/gta-v-ultimate-mod-manager.git
 cd gta-v-ultimate-mod-manager
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -110,22 +114,20 @@ split into `logs/`, `temp/`, `backup/`, `cache/`, `config/` and `library/`.
 
 ## Using it
 
-1. **Dashboard** - confirm the detected installation, its platform and which
-   components are missing.
-2. **Install** - drop an archive anywhere in the window. The preview lists every
-   file operation, the classification and its confidence, the detected vehicles
-   and DLC packs, the conflicts, and any manual steps. Nothing is written until
-   you confirm.
-3. **Installed Mods** - search, verify on-disk integrity, disable or uninstall.
-4. **Conflict Center** - audit everything currently installed, not just the mod
-   being added.
-5. **Backup** - undo the last installation or restore any earlier snapshot.
-6. **Log Viewer** - live, filterable view of the in-memory log ring buffer.
-7. **Settings** - game folder, auto-backup, root-install confirmation, backup
-   generations, 7-Zip path.
+1. **Dashboard** — confirm the detected install, run Essentials + Stability Kit, launch with preflight.
+2. **Install a Mod** — drop an archive; preview operations, conflicts and manual OpenIV steps before confirming.
+3. **Online Mods** — search GTA5-Mods / Nexus, download when possible, then install through the same pipeline.
+4. **Installed Mods** — search, verify integrity, physically enable/disable, or uninstall.
+5. **Spawn Center** — copy vehicle / ped spawn codes from installed mods.
+6. **Graphics Mods** — install NCCVision Ultimate, optional 2K roads, or **Update ReShade** (needs 7-Zip).
+7. **Conflict Center** — audit the whole library; disable conflicting mods in one click.
+8. **Zombie Mode** — install / update / remove Simple Zombies Reborn (`F10` or controller `LB + B` for the menu).
+9. **Backup & Restore** — undo the last install or restore an earlier snapshot.
+10. **Game Diagnostics** — scan logs and the game folder; apply safe one-click repairs.
+11. **Log Viewer** — live, filterable application log.
+12. **Settings** — game folder, backups, language, Nexus API key, 7-Zip / UnRAR paths.
 
-[docs/user-guide.md](docs/user-guide.md) covers the mod types, conflict
-severities and troubleshooting in more detail.
+[docs/user-guide.md](docs/user-guide.md) covers mod types, conflict severities and troubleshooting in more detail.
 
 ## Project layout
 
@@ -143,8 +145,10 @@ gta_mod_manager/
   installer/    transaction, operations, install engine, uninstaller, conflicts
   validator/    plan, game and XML validators
   services/     application use-cases exposed to the UI
+  graphics/     NCCVision pack helpers and ReShade updater
+  resources/    bundled graphics pack (NCCVision injector + shaders)
   gui/          PySide6 shell: theme, widgets, view models, views, main window
-  bootstrap.py  composition root - the only module that wires the graph
+  bootstrap.py  composition root — the only module that wires the graph
   app.py        entry point
 ```
 
@@ -159,13 +163,13 @@ python -m pytest
 
 The suite covers the core kernel, utilities, scanner, detectors, analyzer,
 repositories, backup engine, transaction, plan validator, conflict rules, the
-end-to-end install pipeline, and a GUI smoke test that builds the window and
-visits every page on the offscreen Qt platform.
+end-to-end install pipeline, graphics / ReShade helpers, and a GUI smoke test
+that builds the window and visits every page on the offscreen Qt platform.
 
 ```powershell
 python -m pytest --cov=gta_mod_manager        # coverage
-python -m ruff check gta_mod_manager tests    # lint (clean)
-python -m mypy gta_mod_manager                # type check (strict, clean)
+python -m ruff check gta_mod_manager tests    # lint
+python -m mypy gta_mod_manager                # type check
 python tools\launch_check.py                  # start the real GUI offscreen and quit
 ```
 
@@ -182,7 +186,9 @@ Third-party shader notices are kept in
 [`THIRD_PARTY_LICENSES.txt`](gta_mod_manager/resources/graphics/nccvision/THIRD_PARTY_LICENSES.txt).
 NCCVision downloads the optional road texture archive from its original
 GTA5-Mods source and verifies its SHA-256 hash; that archive and Rockstar game
-assets are not distributed in this repository.
+assets are not distributed in this repository. **Update ReShade** fetches the
+signed installer from [reshade.me](https://reshade.me/) and extracts the injector
+locally (7-Zip required).
 
 This project is an independent community tool. It is not affiliated with,
 endorsed by, or sponsored by Rockstar Games, Take-Two Interactive, ReShade,

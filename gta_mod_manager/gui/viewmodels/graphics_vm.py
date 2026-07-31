@@ -83,6 +83,22 @@ class GraphicsViewModel(ViewModel):
 
         self.run(work, self._on_status)
 
+    def update_reshade(self) -> None:
+        """Download the latest ReShade injector and refresh the pack / game."""
+        self.statusChanged.emit("Updating ReShade from reshade.me...")
+
+        def work() -> str:
+            result = self._graphics.update_reshade()
+            if result.is_error:
+                raise RuntimeError(result.error or "ReShade update failed")
+            return result.unwrap()
+
+        def done(message: str) -> None:
+            self.statusChanged.emit(message)
+            self.refresh()
+
+        self.run(work, done)
+
     def install_road_2k(self) -> None:
         """Download and install the optional selective 2K road add-on."""
         self.statusChanged.emit("Đang tải và cài texture đường 2K an toàn...")

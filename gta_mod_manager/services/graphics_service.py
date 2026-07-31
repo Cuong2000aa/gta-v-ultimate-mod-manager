@@ -15,6 +15,7 @@ from gta_mod_manager.core.app_paths import AppPaths
 from gta_mod_manager.core.logging_setup import get_logger
 from gta_mod_manager.core.result import Result
 from gta_mod_manager.graphics import pack as pack_files
+from gta_mod_manager.graphics import reshade_updater
 from gta_mod_manager.models.game_install import GameInstall
 from gta_mod_manager.models.graphics import GraphicsLevel, GraphicsStatus
 from gta_mod_manager.models.install_plan import ArchiveMemberImport
@@ -57,9 +58,16 @@ _ROAD_2K_LEGACY_MARKERS = ("cuongvision-road-2k.json",)
 class GraphicsService:
     """Manage the NCCVision cinematic pack on the active GTA V install."""
 
-    def __init__(self, game: GameService, paths: AppPaths | None = None) -> None:
+    def __init__(
+        self,
+        game: GameService,
+        paths: AppPaths | None = None,
+        *,
+        seven_zip_path: Path | None = None,
+    ) -> None:
         self._game = game
         self._paths = paths
+        self._seven_zip_path = seven_zip_path
 
     def status(self, install: GameInstall | None = None) -> Result[GraphicsStatus]:
         """Return whether NCCVision is installed and at which level."""
@@ -83,6 +91,7 @@ class GraphicsService:
             except ValueError:
                 level = None
         conflict = self._has_enb_proxy(root)
+        current_version = self.bundled_reshade_version()
         message = ""
         if conflict:
             message = "ENB proxy DLL detected — disable ENB before using NCCVision"
@@ -92,6 +101,8 @@ class GraphicsService:
             message = "NCCVision files present"
         else:
             message = "NCCVision not installed"
+        if current_version:
+            message = f"{message} — ReShade {current_version}"
         marker = self._marker_dir(root)
         preset = None
         if marker is not None and (marker / "active.ini").is_file():
@@ -106,6 +117,8 @@ class GraphicsService:
                 preset_path=preset,
                 conflict_enb=conflict,
                 message=message,
+                reshade_version=current_version,
+                reshade_latest=None,
             )
         )
 
@@ -133,6 +146,78 @@ class GraphicsService:
             return Result.fail(str(error), code="graphics.pack_missing")
         _LOGGER.info("Installed NCCVision level=%s at %s", level.value, root)
         return self.status(target.unwrap())
+
+    def bundled_reshade_version(self) -> str | None:
+        """Return the ProductVersion of the bundled ReShade injector."""
+        try:
+            return reshade_updater.read_injector_version(pack_files.injector_dll())
+        except FileNotFoundError:
+            return None
+
+    def update_reshade(self, install: GameInstall | None = None) -> Result[str]:
+        """Download the latest official ReShade and refresh the NCCVision injector.
+
+        Requires 7-Zip to extract ``ReShade_Setup_*.exe``. When NCCVision is
+        already installed, the game-folder injector is replaced too.
+        """
+        if self._paths is None:
+            return Result.fail(
+                "Application data paths are unavailable",
+                code="graphics.reshade_paths_missing",
+            )
+        seven_zip = reshade_updater.resolve_seven_zip(self._seven_zip_path)
+        if seven_zip is None:
+            return Result.fail(
+                "7-Zip is required to update ReShade. Install 7-Zip or set its "
+                "path in Settings, then try again.",
+                code="graphics.reshade_need_7zip",
+            )
+
+        workspace = self._paths.temp / "reshade-update"
+        version = ""
+        deployed = False
+        try:
+            version, url = reshade_updater.discover_latest()
+            current = self.bundled_reshade_version()
+            if current == version:
+                return Result.ok(f"ReShade is already up to date ({version}).")
+
+            setup_name = url.rsplit("/", 1)[-1]
+            setup = self._paths.downloads / setup_name
+            http_client.download_file(url, setup, timeout=180.0)
+            extracted = reshade_updater.extract_reshade64(setup, workspace, seven_zip)
+
+            injector_dir = pack_files.pack_root() / "injector"
+            injector_dir.mkdir(parents=True, exist_ok=True)
+            target = injector_dir / _INJECTOR_NAME
+            shutil.copy2(extracted, target)
+            reshade_updater.write_injector_version(injector_dir, version)
+            _LOGGER.info("Bundled ReShade injector updated to %s", version)
+
+            status = self.status(install)
+            if (
+                status.is_ok
+                and status.unwrap().installed
+                and not status.unwrap().conflict_enb
+            ):
+                game = self._resolve(install)
+                if game.is_ok:
+                    self._deploy_injector(game.unwrap().root_path)
+                    deployed = True
+        except Exception as error:  # noqa: BLE001 - service boundary returns Result
+            return Result.fail(str(error), code="graphics.reshade_update_failed")
+        finally:
+            if workspace.exists():
+                shutil.rmtree(workspace, ignore_errors=True)
+
+        if deployed:
+            return Result.ok(
+                f"Updated ReShade to {version} and refreshed the game injector."
+            )
+        return Result.ok(
+            f"Updated bundled ReShade to {version}. "
+            "Press Install / update Ultimate to deploy it into the game folder."
+        )
 
     def set_level(
         self,
@@ -335,17 +420,8 @@ class GraphicsService:
         return archive
 
     def _deploy(self, root: Path, level: GraphicsLevel) -> None:
-        injector = pack_files.injector_dll()
         shaders = pack_files.shaders_root()
-        # Never leave two copies of ReShade: that double-hooks the swap chain.
-        injector_name = (
-            _ASI_INJECTOR if (root / "dinput8.dll").is_file() else _INJECTOR_NAME
-        )
-        for name in (_ASI_INJECTOR, _INJECTOR_NAME, _LEGACY_INJECTOR):
-            path = root / name
-            if path.is_file():
-                path.unlink()
-        shutil.copy2(injector, root / injector_name)
+        self._deploy_injector(root)
 
         shader_dst = root / _SHADER_DIR
         if shader_dst.exists():
@@ -389,6 +465,19 @@ class GraphicsService:
         self._write_preset(root, level)
         self._write_reshade_ini(root)
         self._write_manifest(root, level)
+
+    def _deploy_injector(self, root: Path) -> None:
+        """Copy the bundled ReShade injector into the game root (ASI or d3d11)."""
+        injector = pack_files.injector_dll()
+        # Never leave two copies of ReShade: that double-hooks the swap chain.
+        injector_name = (
+            _ASI_INJECTOR if (root / "dinput8.dll").is_file() else _INJECTOR_NAME
+        )
+        for name in (_ASI_INJECTOR, _INJECTOR_NAME, _LEGACY_INJECTOR):
+            path = root / name
+            if path.is_file():
+                path.unlink()
+        shutil.copy2(injector, root / injector_name)
 
     def _write_preset(self, root: Path, level: GraphicsLevel) -> None:
         source = pack_files.preset_path(level)

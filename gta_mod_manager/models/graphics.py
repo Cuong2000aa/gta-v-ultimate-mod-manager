@@ -50,3 +50,5 @@ class GraphicsStatus:
     preset_path: Path | None
     conflict_enb: bool
     message: str = ""
+    reshade_version: str | None = None
+    reshade_latest: str | None = None

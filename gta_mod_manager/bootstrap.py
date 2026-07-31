@@ -347,7 +347,11 @@ def _register_domain_services(container: Container, paths: AppPaths, bus: EventB
     )
     container.register_factory(
         GraphicsService,
-        lambda c: GraphicsService(game=c.resolve(GameService), paths=paths),
+        lambda c: GraphicsService(
+            game=c.resolve(GameService),
+            paths=paths,
+            seven_zip_path=c.resolve(JsonSettingsRepository).load().seven_zip_path,
+        ),
     )
     container.register_factory(
         ZombieModeService,

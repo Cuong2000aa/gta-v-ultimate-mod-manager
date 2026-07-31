@@ -551,6 +551,7 @@ _EN: dict[str, str] = {
         "and restrained AMD CAS. No rain, MagicBloom, DOF, MXAO or depth."
     ),
     "graphics.install": "Install / update Ultimate",
+    "graphics.update_reshade": "Update ReShade",
     "graphics.apply_level": "Apply level",
     "graphics.uninstall": "Uninstall",
     "graphics.status_unknown": "Checking graphics status...",
@@ -574,9 +575,9 @@ _EN: dict[str, str] = {
     "graphics.road_2k.uninstall": "Restore stock roads",
     "graphics.card_tips": "Safety",
     "graphics.tips": (
-        "Do not run ENB together with NCCVision. Use 16x anisotropic filtering for "
-        "distant roads. The single Ultimate profile protects whites, preserves shadow "
-        "detail and uses one restrained sharpening pass."
+        "Do not run ENB together with NCCVision. Use Update ReShade to fetch the "
+        "latest signed build from reshade.me (needs 7-Zip). Use 16x anisotropic "
+        "filtering for distant roads."
     ),
     # Zombie game mode
     "zombie.title": "Zombie Mode",
@@ -1323,6 +1324,7 @@ _VI: dict[str, str] = {
         "Không mưa, MagicBloom, DOF, MXAO hay depth."
     ),
     "graphics.install": "Cài / cập nhật Ultimate",
+    "graphics.update_reshade": "Cập nhật ReShade",
     "graphics.apply_level": "Áp cấp độ",
     "graphics.uninstall": "Gỡ mod",
     "graphics.status_unknown": "Đang kiểm tra đồ họa...",
@@ -1346,9 +1348,8 @@ _VI: dict[str, str] = {
     "graphics.road_2k.uninstall": "Khôi phục đường gốc",
     "graphics.card_tips": "An toàn",
     "graphics.tips": (
-        "Không chạy ENB cùng NCCVision. Đặt Anisotropic Filtering 16x để đường xa rõ. "
-        "Ultimate duy nhất sẽ giữ vùng trắng, mở chi tiết vùng tối và chỉ dùng một lượt "
-        "sharpen vừa đủ."
+        "Không chạy ENB cùng NCCVision. Dùng Cập nhật ReShade để tải bản signed mới "
+        "từ reshade.me (cần 7-Zip). Đặt Anisotropic Filtering 16x để đường xa rõ."
     ),
     # Zombie game mode
     "zombie.title": "Chế độ Zombie",
