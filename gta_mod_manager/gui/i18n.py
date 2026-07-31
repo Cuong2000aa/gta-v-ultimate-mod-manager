@@ -166,7 +166,8 @@ _EN: dict[str, str] = {
     ),
     "library.disable_hint": (
         "Disable moves loose files out of the game folder so they cannot load. "
-        "Shared archive models are restored to stock until you reinstall."
+        "Shared archive models are restored to stock and re-applied when you enable "
+        "(when install-time payloads were cached)."
     ),
     "library.uninstall_title": "Uninstall mod",
     "library.uninstall_complete": "Uninstall complete",
@@ -204,6 +205,12 @@ _EN: dict[str, str] = {
     "conflicts.col_severity": "Severity",
     "conflicts.col_action": "Suggested action",
     "conflicts.none": "No conflicts detected.",
+    "conflicts.disable": "Disable conflicting mods",
+    "conflicts.disable_pick": "Select a conflict row that lists one or more mods first.",
+    "conflicts.disable_confirm": (
+        "Disable {count} conflicting mod(s)? You can re-enable the one you want to keep."
+    ),
+    "conflicts.disable_hint": "Select this row, then press Disable conflicting mods",
     "conflicts.sev_blocking": "Blocking",
     "conflicts.sev_warning": "Warning",
     "conflicts.sev_info": "Info",
@@ -432,7 +439,7 @@ _EN: dict[str, str] = {
     "dashboard.badge_not_detected": "Pick game folder",
     "dashboard.card_validation": "Issues & blockers",
     "dashboard.essentials_install": "Install missing essentials",
-    "dashboard.essentials_manual": "Open ScriptHookV / OpenIV pages",
+    "dashboard.essentials_manual": "Open ScriptHookV / OpenIV / stability pages",
     "dashboard.essentials_mark_ok": "OK",
     "dashboard.essentials_mark_missing": "Missing",
     "dashboard.change_folder": "Change folder...",
@@ -445,7 +452,7 @@ _EN: dict[str, str] = {
     "dashboard.launch_issues_more": "...and {count} more.",
     "dashboard.launch_anyway_hint": "Launch anyway?",
     "dashboard.launch_started": "Started {exe}. Have fun.",
-    "dashboard.essentials_card": "Essentials Kit",
+    "dashboard.essentials_card": "Essentials + Stability Kit",
     "dashboard.essentials_waiting": "Select a GTA V folder to check Story Mode essentials.",
     "dashboard.stat_mods": "Installed mods",
     "dashboard.stat_mods_cap": "tracked by the library",
@@ -511,14 +518,14 @@ _EN: dict[str, str] = {
     "logs.col_message": "Message",
     # Conflict view extras
     "conflicts.owned_by": "Currently owned by {owner}",
-    # Graphics / CuongVision
+    # Graphics / NCCVision
     "graphics.title": "Graphics Mods",
-    "graphics.subtitle": "Install the single flagship CuongVision Ultimate profile.",
+    "graphics.subtitle": "Install the single flagship NCCVision Ultimate profile.",
     "graphics.card_pack": "Pack",
-    "graphics.pack.cuongvision.desc": (
-        "CuongVision Ultimate combines rich cinematic color, protected highlights, "
-        "color-only SMAA and AMD CAS clarity in one FPS-safe profile. No tiers, pale "
-        "FilmicPass, MXAO, DOF, depth bloom or ENB. Home = menu, ScrollLock = toggle."
+    "graphics.pack.nccvision.desc": (
+        "NCCVision Ultimate: lighter filmic grade, stronger scene micro-detail + color-only "
+        "SMAA and AMD CAS — still depth-free and FPS-safe. No MXAO, DOF, MagicBloom or ENB. "
+        "Home = menu, ScrollLock = toggle."
     ),
     "graphics.card_levels": "Visual profile",
     "graphics.level.light": "Light — Natural Clarity",
@@ -540,8 +547,8 @@ _EN: dict[str, str] = {
     ),
     "graphics.level.cinematic_detail_aa": "Cinematic + Detail AA — Ultimate",
     "graphics.level.cinematic_detail_aa.hint": (
-        "Natural low-contrast film grade + color-only SMAA + restrained AMD CAS. "
-        "No rain enhancement, ambient glow, grain, MagicBloom or depth."
+        "Filmic teal/orange grade with soft bloom + local contrast + color-only SMAA "
+        "and restrained AMD CAS. No rain, MagicBloom, DOF, MXAO or depth."
     ),
     "graphics.install": "Install / update Ultimate",
     "graphics.apply_level": "Apply level",
@@ -551,10 +558,10 @@ _EN: dict[str, str] = {
     "graphics.badge_short_missing": "Not installed",
     "graphics.badge_short_conflict": "Blocked by ENB",
     "graphics.badge_short_error": "Error",
-    "graphics.badge_installed": "CuongVision Ultimate is active",
+    "graphics.badge_installed": "NCCVision Ultimate is active",
     "graphics.badge_installed_unknown_level": "Installed successfully",
-    "graphics.badge_not_installed": "Not installed — press Install to add CuongVision Ultimate",
-    "graphics.badge_conflict": "Blocked — ENB detected. Remove ENB before installing CuongVision",
+    "graphics.badge_not_installed": "Not installed — press Install to add NCCVision Ultimate",
+    "graphics.badge_conflict": "Blocked — ENB detected. Remove ENB before installing NCCVision",
     "graphics.badge_error": "Something went wrong — see details below",
     "graphics.card_textures": "Optional selective 2K textures",
     "graphics.road_2k.hint": (
@@ -567,7 +574,7 @@ _EN: dict[str, str] = {
     "graphics.road_2k.uninstall": "Restore stock roads",
     "graphics.card_tips": "Safety",
     "graphics.tips": (
-        "Do not run ENB together with CuongVision. Use 16x anisotropic filtering for "
+        "Do not run ENB together with NCCVision. Use 16x anisotropic filtering for "
         "distant roads. The single Ultimate profile protects whites, preserves shadow "
         "detail and uses one restrained sharpening pass."
     ),
@@ -590,9 +597,9 @@ _EN: dict[str, str] = {
     "zombie.launch": "Launch GTA V",
     "zombie.card_controls": "How to play",
     "zombie.controls": (
-        "In Story Mode press F10 → enable Infection Mode. Press I for inventory, C to "
-        "craft, F for recipes, and E near a survivor to configure them. Gunfire attracts "
-        "larger hordes. Disable Infection Mode before returning to normal Story Mode."
+        "In Story Mode press F10 (or controller LB + B) → enable Infection Mode. "
+        "Inventory: I or LB + X. Craft C, recipes F, E near a survivor to configure them. "
+        "Gunfire attracts larger hordes. Disable Infection Mode before returning to normal Story Mode."
     ),
     "zombie.card_notes": "Compatibility",
     "zombie.notes": (
@@ -813,7 +820,8 @@ _VI: dict[str, str] = {
     ),
     "library.disable_hint": (
         "Tắt sẽ dời file lỏng ra khỏi thư mục game để không còn load. "
-        "Model trong archive dùng chung được trả về stock cho đến khi bạn cài lại."
+        "Model trong archive dùng chung được trả về stock và gắn lại khi bật "
+        "(nếu lần cài đã lưu payload)."
     ),
     "library.uninstall_title": "Gỡ mod",
     "library.uninstall_complete": "Gỡ xong",
@@ -850,6 +858,12 @@ _VI: dict[str, str] = {
     "conflicts.col_severity": "Mức độ",
     "conflicts.col_action": "Gợi ý xử lý",
     "conflicts.none": "Không có xung đột.",
+    "conflicts.disable": "Tắt mod xung đột",
+    "conflicts.disable_pick": "Chọn một dòng xung đột có liệt kê mod trước.",
+    "conflicts.disable_confirm": (
+        "Tắt {count} mod xung đột? Bạn có thể bật lại mod muốn giữ."
+    ),
+    "conflicts.disable_hint": "Chọn dòng này rồi bấm Tắt mod xung đột",
     "conflicts.sev_blocking": "Chặn cài",
     "conflicts.sev_warning": "Cảnh báo",
     "conflicts.sev_info": "Thông tin",
@@ -1205,10 +1219,10 @@ _VI: dict[str, str] = {
     "dashboard.launch_issues_more": "...và thêm {count} mục nữa.",
     "dashboard.launch_anyway_hint": "Vẫn mở game?",
     "dashboard.launch_started": "Đã mở {exe}. Chơi vui.",
-    "dashboard.essentials_card": "Bộ Essentials",
+    "dashboard.essentials_card": "Bộ Essentials + Ổn định",
     "dashboard.essentials_waiting": "Chọn thư mục GTA V để kiểm tra essentials Story Mode.",
     "dashboard.essentials_install": "Cài essentials còn thiếu",
-    "dashboard.essentials_manual": "Mở trang ScriptHookV / OpenIV",
+    "dashboard.essentials_manual": "Mở trang ScriptHookV / OpenIV / ổn định",
     "dashboard.stat_mods": "Mod đã cài",
     "dashboard.stat_mods_cap": "được thư viện theo dõi",
     "dashboard.stat_components": "Thành phần",
@@ -1276,14 +1290,14 @@ _VI: dict[str, str] = {
     "logs.col_message": "Nội dung",
     # Conflict view extras
     "conflicts.owned_by": "Đang thuộc mod {owner}",
-    # Graphics / CuongVision
+    # Graphics / NCCVision
     "graphics.title": "Mod đồ họa",
-    "graphics.subtitle": "Cài một profile CuongVision Ultimate cao cấp duy nhất.",
+    "graphics.subtitle": "Cài một profile NCCVision Ultimate cao cấp duy nhất.",
     "graphics.card_pack": "Gói",
-    "graphics.pack.cuongvision.desc": (
-        "CuongVision Ultimate kết hợp màu cinematic đậm, chống cháy sáng, SMAA màu và "
-        "AMD CAS làm rõ chi tiết trong một profile nhẹ FPS. Không còn phân cấp, FilmicPass "
-        "nhợt màu, MXAO, DOF, depth bloom hay ENB. Home = menu, ScrollLock = bật/tắt."
+    "graphics.pack.nccvision.desc": (
+        "NCCVision Ultimate: grade phim nhạt hơn, micro-detail cảnh vật rõ hơn + SMAA màu "
+        "và AMD CAS — vẫn không đọc depth, nhẹ FPS. Không MXAO, DOF, MagicBloom hay ENB. "
+        "Home = menu, ScrollLock = bật/tắt."
     ),
     "graphics.card_levels": "Gói hình ảnh",
     "graphics.level.light": "Nhẹ — Natural Clarity",
@@ -1305,8 +1319,8 @@ _VI: dict[str, str] = {
     ),
     "graphics.level.cinematic_detail_aa": "Cinematic + Chi tiết AA — Ultimate",
     "graphics.level.cinematic_detail_aa.hint": (
-        "Grade phim tự nhiên, tương phản thấp + SMAA màu + AMD CAS nhẹ. Không nâng cấp mưa, "
-        "ambient glow, grain, MagicBloom hay depth."
+        "Grade phim teal/cam + bloom mềm + local contrast + SMAA màu và AMD CAS nhẹ. "
+        "Không mưa, MagicBloom, DOF, MXAO hay depth."
     ),
     "graphics.install": "Cài / cập nhật Ultimate",
     "graphics.apply_level": "Áp cấp độ",
@@ -1316,10 +1330,10 @@ _VI: dict[str, str] = {
     "graphics.badge_short_missing": "Chưa cài",
     "graphics.badge_short_conflict": "Bị ENB chặn",
     "graphics.badge_short_error": "Lỗi",
-    "graphics.badge_installed": "CuongVision Ultimate đang hoạt động",
+    "graphics.badge_installed": "NCCVision Ultimate đang hoạt động",
     "graphics.badge_installed_unknown_level": "Đã cài thành công",
-    "graphics.badge_not_installed": "Chưa cài — bấm Cài để thêm CuongVision Ultimate",
-    "graphics.badge_conflict": "Bị chặn — phát hiện ENB. Gỡ ENB trước khi cài CuongVision",
+    "graphics.badge_not_installed": "Chưa cài — bấm Cài để thêm NCCVision Ultimate",
+    "graphics.badge_conflict": "Bị chặn — phát hiện ENB. Gỡ ENB trước khi cài NCCVision",
     "graphics.badge_error": "Có lỗi — xem chi tiết bên dưới",
     "graphics.card_textures": "Texture 2K chọn lọc (tùy chọn)",
     "graphics.road_2k.hint": (
@@ -1332,7 +1346,7 @@ _VI: dict[str, str] = {
     "graphics.road_2k.uninstall": "Khôi phục đường gốc",
     "graphics.card_tips": "An toàn",
     "graphics.tips": (
-        "Không chạy ENB cùng CuongVision. Đặt Anisotropic Filtering 16x để đường xa rõ. "
+        "Không chạy ENB cùng NCCVision. Đặt Anisotropic Filtering 16x để đường xa rõ. "
         "Ultimate duy nhất sẽ giữ vùng trắng, mở chi tiết vùng tối và chỉ dùng một lượt "
         "sharpen vừa đủ."
     ),
@@ -1355,9 +1369,9 @@ _VI: dict[str, str] = {
     "zombie.launch": "Mở GTA V",
     "zombie.card_controls": "Cách chơi",
     "zombie.controls": (
-        "Trong Story Mode nhấn F10 → bật Infection Mode. Nhấn I mở túi đồ, C chế tạo, "
-        "F xem công thức, E gần đồng đội để chỉnh lệnh. Tiếng súng sẽ kéo horde lớn tới. "
-        "Tắt Infection Mode trước khi quay lại Story Mode bình thường."
+        "Trong Story Mode nhấn F10 (hoặc tay cầm LB + B) → bật Infection Mode. "
+        "Túi đồ: I hoặc LB + X. C chế tạo, F xem công thức, E gần đồng đội để chỉnh lệnh. "
+        "Tiếng súng sẽ kéo horde lớn tới. Tắt Infection Mode trước khi quay lại Story Mode bình thường."
     ),
     "zombie.card_notes": "Tương thích",
     "zombie.notes": (

@@ -13,7 +13,7 @@ from typing import Any
 
 from gta_mod_manager.models.backup_snapshot import BackupEntry, BackupSnapshot, OperationRecord
 from gta_mod_manager.models.enums import ModStatus, OperationKind, OperationStatus
-from gta_mod_manager.models.mod_package import InstalledFileRecord, InstalledMod
+from gta_mod_manager.models.mod_package import CachedArchiveMember, InstalledFileRecord, InstalledMod
 from gta_mod_manager.models.vehicle import VehicleDefinition
 from gta_mod_manager.models.settings import AppSettings
 
@@ -63,6 +63,13 @@ def encode_installed_mod(mod: InstalledMod) -> dict[str, Any]:
                 "replaced_existing": record.replaced_existing,
                 "shared_archive": record.shared_archive,
                 "archive_members": list(record.archive_members),
+                "member_payloads": [
+                    {
+                        "member_path": payload.member_path,
+                        "library_relative": payload.library_relative,
+                    }
+                    for payload in record.member_payloads
+                ],
             }
             for record in mod.installed_files
         ],
@@ -96,6 +103,14 @@ def decode_installed_mod(payload: dict[str, Any]) -> InstalledMod:
             shared_archive=bool(item.get("shared_archive", False)),
             archive_members=tuple(
                 str(member) for member in item.get("archive_members", []) if member
+            ),
+            member_payloads=tuple(
+                CachedArchiveMember(
+                    member_path=str(payload.get("member_path", "")),
+                    library_relative=str(payload.get("library_relative", "")),
+                )
+                for payload in item.get("member_payloads", [])
+                if payload.get("member_path") and payload.get("library_relative")
             ),
         )
         for item in payload.get("installed_files", [])

@@ -19,6 +19,7 @@ class Conflict:
         description: Human readable explanation.
         paths: Files involved in the conflict.
         owner: Mod that currently owns the colliding resource, when known.
+        owner_mod_ids: Library ids for mods involved (for one-click disable).
         resolution_hint: Suggested action shown in the conflict center.
     """
 
@@ -28,6 +29,7 @@ class Conflict:
     description: str
     paths: tuple[Path, ...] = field(default_factory=tuple)
     owner: str | None = None
+    owner_mod_ids: tuple[str, ...] = ()
     resolution_hint: str | None = None
 
     @property

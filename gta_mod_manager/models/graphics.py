@@ -1,4 +1,4 @@
-"""Models for the bundled CuongVision graphics pack."""
+"""Models for the bundled NCCVision graphics pack."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 class GraphicsLevel(str, Enum):
-    """Visual profile for CuongVision."""
+    """Visual profile for NCCVision."""
 
     LIGHT = "light"
     MEDIUM = "medium"

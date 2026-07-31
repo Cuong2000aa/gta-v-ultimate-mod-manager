@@ -128,7 +128,7 @@ class Application:
 
     @property
     def graphics(self) -> GraphicsService:
-        """Return the CuongVision graphics pack service."""
+        """Return the NCCVision graphics pack service."""
         return self.container.resolve(GraphicsService)
 
     @property

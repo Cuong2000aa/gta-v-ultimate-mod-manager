@@ -45,7 +45,7 @@ third-party plugin that builds an unsafe plan cannot get it executed.
 | Conflict detection | Duplicate spawn codes, DLC packs, handling ids, textures, packfiles, a second `gameconfig.xml`, overwritten files with the owning mod named, and missing dependencies |
 | Backup and restore | Snapshot per installation, undo, restore, delete, and pruning by generation count |
 | Uninstall | Removes exactly the files the installation recorded, then the directories it created |
-| CuongVision Ultimate | One depth-free cinematic ReShade profile with highlight protection, color-edge SMAA, AMD CAS clarity, and an optional verified 2K road download |
+| NCCVision Ultimate | One depth-free cinematic ReShade profile with filmic teal/orange grade, soft bloom, color-edge SMAA, AMD CAS, and an optional verified 2K road download |
 | Plugin system | Game-specific knowledge lives in a plugin; the core knows nothing about GTA V |
 
 ## Requirements
@@ -179,8 +179,8 @@ instead of only on a developer's desktop.
 The application source is available under the [MIT License](LICENSE).
 
 Third-party shader notices are kept in
-[`THIRD_PARTY_LICENSES.txt`](gta_mod_manager/resources/graphics/cuongvision/THIRD_PARTY_LICENSES.txt).
-CuongVision downloads the optional road texture archive from its original
+[`THIRD_PARTY_LICENSES.txt`](gta_mod_manager/resources/graphics/nccvision/THIRD_PARTY_LICENSES.txt).
+NCCVision downloads the optional road texture archive from its original
 GTA5-Mods source and verifies its SHA-256 hash; that archive and Rockstar game
 assets are not distributed in this repository.
 

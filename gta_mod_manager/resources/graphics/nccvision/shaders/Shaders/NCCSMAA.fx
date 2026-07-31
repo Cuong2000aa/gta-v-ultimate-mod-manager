@@ -12,7 +12,7 @@
  *                               for ReShade 3.0+
  */
 
-// CuongVision safety variant:
+// NCCVision safety variant:
 // Color-edge SMAA only. Depth sampling and predication are deliberately removed
 // so GTA V never exposes its depth buffer to this effect.
 

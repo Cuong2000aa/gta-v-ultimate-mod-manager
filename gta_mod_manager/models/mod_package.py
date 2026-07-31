@@ -76,6 +76,14 @@ class ModPackage:
 
 
 @dataclass(frozen=True, slots=True)
+class CachedArchiveMember:
+    """Payload cached under the app library so enable can re-import RPF members."""
+
+    member_path: str
+    library_relative: str
+
+
+@dataclass(frozen=True, slots=True)
 class InstalledFileRecord:
     """One file written by an installation, used for exact uninstallation.
 
@@ -88,6 +96,7 @@ class InstalledFileRecord:
             the install-time backup when this mod is the sole owner; otherwise
             it is left in place.
         archive_members: Member paths imported into a shared archive.
+        member_payloads: Cached source bytes for re-enable after a physical disable.
     """
 
     target_path: Path
@@ -95,6 +104,7 @@ class InstalledFileRecord:
     replaced_existing: bool = False
     shared_archive: bool = False
     archive_members: tuple[str, ...] = ()
+    member_payloads: tuple[CachedArchiveMember, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

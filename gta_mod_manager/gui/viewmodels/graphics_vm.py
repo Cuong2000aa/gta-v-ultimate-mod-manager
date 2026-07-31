@@ -1,4 +1,4 @@
-"""View model for the Graphics / CuongVision page."""
+"""View model for the Graphics / NCCVision page."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from gta_mod_manager.services.graphics_service import GraphicsService
 
 
 class GraphicsViewModel(ViewModel):
-    """Install, switch level, or remove CuongVision."""
+    """Install, switch level, or remove NCCVision."""
 
     statusLoaded = Signal(object)
 
@@ -59,9 +59,9 @@ class GraphicsViewModel(ViewModel):
         self.run(work, done)
 
     def install(self) -> None:
-        """Install the single CuongVision Ultimate profile."""
+        """Install the single NCCVision Ultimate profile."""
         level = GraphicsLevel.CINEMATIC_DETAIL_AA
-        self.statusChanged.emit("Installing CuongVision Ultimate...")
+        self.statusChanged.emit("Installing NCCVision Ultimate...")
 
         def work() -> GraphicsStatus:
             result = self._graphics.install(level)
@@ -72,8 +72,8 @@ class GraphicsViewModel(ViewModel):
         self.run(work, self._on_status)
 
     def uninstall(self) -> None:
-        """Remove CuongVision from the game folder."""
-        self.statusChanged.emit("Removing CuongVision...")
+        """Remove NCCVision from the game folder."""
+        self.statusChanged.emit("Removing NCCVision...")
 
         def work() -> GraphicsStatus:
             result = self._graphics.uninstall()

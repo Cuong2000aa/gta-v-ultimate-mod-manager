@@ -74,6 +74,68 @@ def test_physical_disable_and_enable_moves_loose_files(tmp_path: Path) -> None:
     assert not quarantine.exists()
 
 
+def test_enable_reapplies_cached_shared_archive_payloads(
+    tmp_path: Path, monkeypatch
+) -> None:
+    library, game_root, mods = _service(tmp_path)
+    archive = game_root / "mods" / "x64e.rpf"
+    archive.parent.mkdir(parents=True)
+    archive.write_bytes(b"archive")
+
+    payload_root = library._paths.library / "rpf-members" / "replace-car"
+    payload_root.mkdir(parents=True)
+    cached = payload_root / "levels__gta5__vehicles.rpf__buffalo2.yft"
+    cached.write_bytes(b"mesh")
+
+    from gta_mod_manager.models.mod_package import CachedArchiveMember
+
+    mod = InstalledMod(
+        mod_id="replace-car",
+        display_name="Replace Car",
+        game_root=game_root,
+        kind="vehicle",
+        installed_files=(
+            InstalledFileRecord(
+                target_path=archive,
+                shared_archive=True,
+                archive_members=("levels/gta5/vehicles.rpf/buffalo2.yft",),
+                member_payloads=(
+                    CachedArchiveMember(
+                        member_path="levels/gta5/vehicles.rpf/buffalo2.yft",
+                        library_relative=(
+                            "rpf-members/replace-car/"
+                            "levels__gta5__vehicles.rpf__buffalo2.yft"
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+    mods.add(mod)
+
+    calls: list[tuple] = []
+
+    def fake_restore(*_args, **_kwargs):
+        return (), 1, 0
+
+    def fake_import(path, members):
+        calls.append((path, tuple(item.member_path for item in members)))
+
+    monkeypatch.setattr(library, "_restore_shared_archives", fake_restore)
+    monkeypatch.setattr(
+        "gta_mod_manager.services.library_service.import_members", fake_import
+    )
+
+    library.set_enabled("replace-car", False).unwrap()
+    assert mods.get("replace-car").status is ModStatus.DISABLED
+
+    result = library.set_enabled("replace-car", True)
+    assert result.is_ok
+    assert mods.get("replace-car").status is ModStatus.INSTALLED
+    assert calls
+    assert calls[0][0] == archive
+    assert calls[0][1] == ("levels/gta5/vehicles.rpf/buffalo2.yft",)
+
 def test_verify_keeps_disabled_status(tmp_path: Path) -> None:
     library, game_root, mods = _service(tmp_path)
     target = game_root / "scripts" / "A.dll"

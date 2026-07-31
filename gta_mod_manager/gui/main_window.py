@@ -117,7 +117,9 @@ class MainWindow(QMainWindow):
             self._runner, app.zombie, app.launch, self
         )
         self._backup_vm = BackupViewModel(self._runner, app.backups, self._reporter, self)
-        self._conflict_vm = ConflictViewModel(self._runner, app.conflicts, app.game, self)
+        self._conflict_vm = ConflictViewModel(
+            self._runner, app.conflicts, app.game, self, library=app.library
+        )
         self._diagnostics_vm = DiagnosticsViewModel(
             self._runner, app.diagnostics, app.game, self
         )

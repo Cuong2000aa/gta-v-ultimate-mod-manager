@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QMessageBox,
     QPushButton,
     QTreeWidget,
     QTreeWidgetItem,
@@ -41,6 +43,8 @@ _SEVERITY_COLOURS: dict[ConflictSeverity, str] = {
     ConflictSeverity.INFO: DARK_PALETTE.text_muted,
 }
 
+_ROLE_MOD_IDS = Qt.ItemDataRole.UserRole
+
 
 class ConflictView(QWidget):
     """Shows the audit of the whole installation, grouped by conflict type."""
@@ -74,6 +78,10 @@ class ConflictView(QWidget):
         rescan.clicked.connect(self._vm.refresh)
         toolbar.addWidget(rescan)
 
+        self._disable = QPushButton(t("conflicts.disable"))
+        self._disable.clicked.connect(self._disable_selected)
+        toolbar.addWidget(self._disable)
+
         expand = QPushButton(t("common.expand_all"))
         expand.clicked.connect(lambda: self._tree.expandAll())
         toolbar.addWidget(expand)
@@ -103,6 +111,33 @@ class ConflictView(QWidget):
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         card.body.addWidget(self._tree)
         layout.addWidget(card, 1)
+
+    def _disable_selected(self) -> None:
+        """Disable mods involved in the selected conflict row."""
+        item = self._tree.currentItem()
+        if item is None:
+            QMessageBox.information(self, t("conflicts.disable"), t("conflicts.disable_pick"))
+            return
+        mod_ids = item.data(0, _ROLE_MOD_IDS)
+        if not mod_ids and item.childCount():
+            # Parent group selected — use first child that has ids.
+            for index in range(item.childCount()):
+                child_ids = item.child(index).data(0, _ROLE_MOD_IDS)
+                if child_ids:
+                    mod_ids = child_ids
+                    break
+        if not mod_ids:
+            QMessageBox.information(self, t("conflicts.disable"), t("conflicts.disable_pick"))
+            return
+        ids = tuple(str(mod_id) for mod_id in mod_ids)
+        confirm = QMessageBox.question(
+            self,
+            t("conflicts.disable"),
+            t("conflicts.disable_confirm", count=len(ids)),
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        self._vm.disable_mods(ids)
 
     def _render(self, groups: tuple[ConflictGroup, ...]) -> None:
         """Rebuild the tree from the audit result."""
@@ -139,13 +174,17 @@ class ConflictView(QWidget):
             self._tree.addTopLevelItem(parent)
 
             for conflict in group.conflicts:
+                action = conflict.resolution_hint or ""
+                if conflict.owner_mod_ids:
+                    action = t("conflicts.disable_hint") if not action else action
                 child = QTreeWidgetItem(
                     [
                         conflict.description,
                         t(_SEVERITY_KEYS[conflict.severity]),
-                        conflict.resolution_hint or "",
+                        action,
                     ]
                 )
+                child.setData(0, _ROLE_MOD_IDS, conflict.owner_mod_ids)
                 child.setForeground(1, QBrush(QColor(_SEVERITY_COLOURS[conflict.severity])))
                 if conflict.paths:
                     child.setToolTip(

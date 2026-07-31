@@ -1,0 +1,16 @@
+NCCVision 3.1-ultimate — one flagship FPS-safe ReShade profile for GTA V
+
+This pack ships with GTA V Ultimate Mod Manager. It does not redistribute
+Rockstar assets. ReShade injector and community shaders keep their upstream
+licenses (see THIRD_PARTY_LICENSES.txt).
+
+NCCVision follows the safe ReShade layer pattern:
+  - Color / lighting only (no depth buffer effects)
+  - No MXAO, DOF, SSR, MagicBloom, or ENB
+  - One profile only: NCCVision Ultimate
+  - Three passes: color-edge SMAA, NCCCinematic, AMD FidelityFX CAS
+
+NCCVision Ultimate:
+  - Soft filmic curve with teal shadows / warm highlights
+  - Neighbor soft bloom + mild local contrast + vignette
+  - Color-edge SMAA + restrained CAS for clarity without depth crashes

@@ -1,4 +1,4 @@
-CuongVision third-party shader notices
+NCCVision third-party shader notices
 ======================================
 
 ReShade injector binary (d3d11.dll)

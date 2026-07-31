@@ -1,4 +1,4 @@
-"""Tests for CuongVision graphics install / level switch / uninstall."""
+"""Tests for NCCVision graphics install / level switch / uninstall."""
 
 from __future__ import annotations
 
@@ -39,6 +39,8 @@ def _fake_game(root: Path) -> GameInstall:
 def test_pack_presets_exist_and_differ() -> None:
     root = pack_root()
     assert pack_info().levels == (GraphicsLevel.CINEMATIC_DETAIL_AA,)
+    assert pack_info().display_name == "NCCVision"
+    assert pack_info().pack_id == "nccvision"
     assert (root / "injector" / "d3d11.dll").is_file() or (
         root / "injector" / "dxgi.dll"
     ).is_file()
@@ -82,7 +84,7 @@ def test_pack_presets_exist_and_differ() -> None:
     )
     for technique in (
         "SMAA",
-        "CuongCinematic",
+        "NCCCinematic",
         "ContrastAdaptiveSharpen",
     ):
         assert technique in ultimate_techniques
@@ -93,21 +95,23 @@ def test_pack_presets_exist_and_differ() -> None:
     assert "AmbientLight" not in ultimate_techniques
     assert "MagicBloom" not in ultimate_techniques
     assert "FilmGrain2" not in ultimate_techniques
-    assert "HighlightCompression=0.35" in ultimate
-    assert "Saturation=1.14" in ultimate
-    assert "Sharpening=0.52" in ultimate
+    assert "HighlightCompression=0.36" in ultimate
+    assert "Saturation=1.08" in ultimate
+    assert "SoftBloom=0.08" in ultimate
+    assert "LocalContrast=0.24" in ultimate
+    assert "Sharpening=0.72" in ultimate
 
 
 def test_detail_aa_assets_are_color_only() -> None:
     root = pack_root() / "shaders"
-    shader = (root / "Shaders" / "CuongSMAA.fx").read_text(encoding="utf-8")
+    shader = (root / "Shaders" / "NCCSMAA.fx").read_text(encoding="utf-8")
     assert "GetLinearizedDepth" not in shader
     assert "LinearizeDepthPass" not in shader
     assert (root / "Shaders" / "SMAA.fxh").is_file()
     assert (root / "Shaders" / "CAS.fx").is_file()
-    cinematic = (root / "Shaders" / "CuongCinematic.fx").read_text(encoding="utf-8")
+    cinematic = (root / "Shaders" / "NCCCinematic.fx").read_text(encoding="utf-8")
     assert "ReShade::DepthBuffer" not in cinematic
-    assert "CuongCinematicPass" in cinematic
+    assert "NCCCinematicPass" in cinematic
     assert not (root / "Shaders" / "CuongWeather.fx").exists()
     assert (root / "Shaders" / "ReShade.fxh").is_file()
     assert (root / "Shaders" / "ReShadeUI.fxh").is_file()
@@ -150,29 +154,29 @@ def test_install_switch_uninstall(tmp_path: Path) -> None:
     assert (install.root_path / "reshade-shaders" / "Shaders").is_dir()
     assert not (install.root_path / "reshade-shaders" / "Shaders" / "Bloom.fx").exists()
     assert not (install.root_path / "reshade-shaders" / "Shaders" / "DOF.fx").exists()
-    assert (install.root_path / "reshade-shaders" / "Shaders" / "CuongSMAA.fx").is_file()
+    assert (install.root_path / "reshade-shaders" / "Shaders" / "NCCSMAA.fx").is_file()
     assert (install.root_path / "reshade-shaders" / "Shaders" / "CAS.fx").is_file()
     assert (install.root_path / "reshade-shaders" / "Textures" / "AreaTex.png").is_file()
     assert (install.root_path / "reshade-shaders" / "Textures" / "SearchTex.png").is_file()
-    active = (install.root_path / "CuongVision" / "active.ini").read_text(encoding="utf-8")
+    active = (install.root_path / "NCCVision" / "active.ini").read_text(encoding="utf-8")
     assert "MagicBloom" not in active
 
     status = service.set_level(GraphicsLevel.VERY_HIGH).unwrap()
     assert status.level is GraphicsLevel.VERY_HIGH
-    active = (install.root_path / "CuongVision" / "active.ini").read_text(encoding="utf-8")
+    active = (install.root_path / "NCCVision" / "active.ini").read_text(encoding="utf-8")
     assert "FilmGrain2" in active
 
     status = service.set_level(GraphicsLevel.DETAIL_AA).unwrap()
     assert status.level is GraphicsLevel.DETAIL_AA
-    active = (install.root_path / "CuongVision" / "active.ini").read_text(encoding="utf-8")
+    active = (install.root_path / "NCCVision" / "active.ini").read_text(encoding="utf-8")
     assert "SMAA" in active
     assert "ContrastAdaptiveSharpen" in active
 
     status = service.set_level(GraphicsLevel.CINEMATIC_DETAIL_AA).unwrap()
     assert status.level is GraphicsLevel.CINEMATIC_DETAIL_AA
-    active = (install.root_path / "CuongVision" / "active.ini").read_text(encoding="utf-8")
+    active = (install.root_path / "NCCVision" / "active.ini").read_text(encoding="utf-8")
     assert "SMAA" in active
-    assert "CuongCinematic" in active
+    assert "NCCCinematic" in active
     assert "ContrastAdaptiveSharpen" in active
     assert "Mode1" not in active
     assert "LevelsPlus" not in active
@@ -184,7 +188,7 @@ def test_install_switch_uninstall(tmp_path: Path) -> None:
     status = service.uninstall().unwrap()
     assert not status.installed
     assert not (install.root_path / "d3d11.dll").exists()
-    assert not (install.root_path / "CuongVision").exists()
+    assert not (install.root_path / "NCCVision").exists()
 
 
 def test_enb_conflict_blocks_install(tmp_path: Path) -> None:
@@ -209,9 +213,31 @@ def test_install_uses_asi_when_loader_is_present(tmp_path: Path) -> None:
     assert not (install.root_path / "d3d11.dll").exists()
     assert not (install.root_path / "dxgi.dll").exists()
     manifest = (
-        install.root_path / "CuongVision" / "manager_manifest.json"
+        install.root_path / "NCCVision" / "manager_manifest.json"
     ).read_text(encoding="utf-8")
     assert '"injector": "ReShade.asi"' in manifest
+
+
+def test_legacy_cuongvision_marker_is_detected_and_migrated(tmp_path: Path) -> None:
+    install = _fake_game(tmp_path / "game")
+    legacy = install.root_path / "CuongVision"
+    legacy.mkdir()
+    (legacy / "manager_manifest.json").write_text(
+        '{"pack_id":"cuongvision","level":"cinematic_detail_aa"}',
+        encoding="utf-8",
+    )
+    (install.root_path / "d3d11.dll").write_bytes(b"reshade")
+    (install.root_path / "reshade-shaders" / "Shaders").mkdir(parents=True)
+
+    service = GraphicsService(_Game(install))
+    status = service.status().unwrap()
+    assert status.installed
+    assert status.level is GraphicsLevel.CINEMATIC_DETAIL_AA
+
+    status = service.install(GraphicsLevel.CINEMATIC_DETAIL_AA).unwrap()
+    assert status.installed
+    assert (install.root_path / "NCCVision").is_dir()
+    assert not (install.root_path / "CuongVision").exists()
 
 
 def test_selective_2k_roads_install_and_restore(
@@ -245,6 +271,7 @@ def test_selective_2k_roads_install_and_restore(
     result = service.install_road_2k()
     assert result.is_ok
     assert service.road_2k_installed()
+    assert (install.mods_path / "nccvision-road-2k.json").is_file()
     mods = install.mods_path / "x64g.rpf"
     with RpfArchive.from_path(str(mods)) as outer:
         nested = outer.load_nested_archive(

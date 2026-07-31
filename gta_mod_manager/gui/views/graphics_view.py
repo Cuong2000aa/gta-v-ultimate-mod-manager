@@ -1,4 +1,4 @@
-"""Graphics page: install / switch / remove CuongVision cinematic levels."""
+"""Graphics page: install / switch / remove NCCVision cinematic levels."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from gta_mod_manager.models.graphics import GraphicsStatus
 
 
 class GraphicsView(QWidget):
-    """UI for the bundled CuongVision graphics pack."""
+    """UI for the bundled NCCVision graphics pack."""
 
     def __init__(self, view_model: GraphicsViewModel, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -58,7 +58,7 @@ class GraphicsView(QWidget):
         layout.addWidget(self._badge_detail)
 
         pack = Card(t("graphics.card_pack"))
-        pack_body = QLabel(t("graphics.pack.cuongvision.desc"))
+        pack_body = QLabel(t("graphics.pack.nccvision.desc"))
         pack_body.setObjectName("Hint")
         pack_body.setWordWrap(True)
         pack.body.addWidget(pack_body)

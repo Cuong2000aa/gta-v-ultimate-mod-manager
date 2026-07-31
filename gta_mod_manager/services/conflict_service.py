@@ -10,7 +10,7 @@ from gta_mod_manager.core import constants
 from gta_mod_manager.core.logging_setup import get_logger
 from gta_mod_manager.installer.vehicle_keys import model_keys_for_installed_mod
 from gta_mod_manager.models.conflict import Conflict, ConflictReport
-from gta_mod_manager.models.enums import ConflictSeverity, ConflictType
+from gta_mod_manager.models.enums import ConflictSeverity, ConflictType, ModStatus
 from gta_mod_manager.models.game_install import GameInstall
 from gta_mod_manager.models.mod_package import InstalledMod
 from gta_mod_manager.repository.mod_repository import JsonModRepository
@@ -48,7 +48,11 @@ class ConflictService:
 
     def audit(self, install: GameInstall) -> ConflictReport:
         """Return every conflict between the mods installed in ``install``."""
-        installed = self._mods.list_for_game(install.root_path)
+        installed = tuple(
+            mod
+            for mod in self._mods.list_for_game(install.root_path)
+            if mod.status is not ModStatus.DISABLED
+        )
         conflicts: list[Conflict] = []
         conflicts.extend(self._shared_files(installed))
         conflicts.extend(self._duplicate_replace_vehicles(installed))
@@ -88,28 +92,34 @@ class ConflictService:
         vehicles intentionally share that file. Collisions inside it are
         reported by :meth:`_duplicate_replace_vehicles` instead.
         """
-        owners: dict[str, list[str]] = defaultdict(list)
+        owners: dict[str, list[tuple[str, str]]] = defaultdict(list)
         paths: dict[str, Path] = {}
         for mod in installed:
             for record in mod.installed_files:
                 if record.shared_archive:
                     continue
                 key = str(record.target_path).lower()
-                owners[key].append(mod.display_name)
+                owners[key].append((mod.mod_id, mod.display_name))
                 paths[key] = record.target_path
-        return tuple(
-            Conflict(
-                conflict_type=ConflictType.FILE_OVERWRITE,
-                severity=ConflictSeverity.WARNING,
-                key=paths[key].name,
-                description=f"{paths[key].name} is claimed by: {', '.join(names)}",
-                paths=(paths[key],),
-                owner=names[0],
-                resolution_hint="The mod installed last owns the file on disk",
+        conflicts: list[Conflict] = []
+        for key, entries in sorted(owners.items()):
+            ids = tuple(dict.fromkeys(mod_id for mod_id, _ in entries))
+            if len(ids) < 2:
+                continue
+            names = tuple(dict.fromkeys(name for _, name in entries))
+            conflicts.append(
+                Conflict(
+                    conflict_type=ConflictType.FILE_OVERWRITE,
+                    severity=ConflictSeverity.WARNING,
+                    key=paths[key].name,
+                    description=f"{paths[key].name} is claimed by: {', '.join(names)}",
+                    paths=(paths[key],),
+                    owner=names[0],
+                    owner_mod_ids=ids,
+                    resolution_hint="Disable one of the conflicting mods",
+                )
             )
-            for key, names in sorted(owners.items())
-            if len(names) > 1
-        )
+        return tuple(conflicts)
 
     @staticmethod
     def _duplicate_replace_vehicles(installed: tuple[InstalledMod, ...]) -> tuple[Conflict, ...]:
@@ -118,7 +128,7 @@ class ConflictService:
         Keys come from declared spawn codes and from ``.yft`` / ``.ytd`` members
         imported into a shared archive (``buffalo2.yft`` → ``buffalo2``).
         """
-        owners: dict[str, list[str]] = defaultdict(list)
+        owners: dict[str, list[tuple[str, str]]] = defaultdict(list)
         for mod in installed:
             members = [
                 member
@@ -126,47 +136,60 @@ class ConflictService:
                 for member in record.archive_members
             ]
             for key in model_keys_for_installed_mod(mod.spawn_codes, members):
-                owners[key].append(mod.display_name)
-        return tuple(
-            Conflict(
-                conflict_type=ConflictType.DUPLICATE_VEHICLE_NAME,
-                severity=ConflictSeverity.BLOCKING,
-                key=code,
-                description=(
-                    f"Two or more mods replace spawn '{code}': {', '.join(names)}. "
-                    "Only one replace vehicle can own that stock model."
-                ),
-                owner=names[0],
-                resolution_hint="Uninstall one of the mods, or pick a different replace target",
+                owners[key].append((mod.mod_id, mod.display_name))
+        conflicts: list[Conflict] = []
+        for code, entries in sorted(owners.items()):
+            ids = tuple(dict.fromkeys(mod_id for mod_id, _ in entries))
+            if len(ids) < 2:
+                continue
+            names = tuple(dict.fromkeys(name for _, name in entries))
+            conflicts.append(
+                Conflict(
+                    conflict_type=ConflictType.DUPLICATE_VEHICLE_NAME,
+                    severity=ConflictSeverity.BLOCKING,
+                    key=code,
+                    description=(
+                        f"Two or more mods replace spawn '{code}': {', '.join(names)}. "
+                        "Only one replace vehicle can own that stock model."
+                    ),
+                    owner=names[0],
+                    owner_mod_ids=ids,
+                    resolution_hint="Disable one of the conflicting mods",
+                )
             )
-            for code, names in sorted(owners.items())
-            if len(set(names)) > 1
-        )
+        return tuple(conflicts)
 
     @staticmethod
     def _duplicate_dlc_packs(installed: tuple[InstalledMod, ...]) -> tuple[Conflict, ...]:
         """Return DLC pack names registered by more than one mod."""
-        owners: dict[str, list[str]] = defaultdict(list)
+        owners: dict[str, list[tuple[str, str]]] = defaultdict(list)
         for mod in installed:
             for pack in mod.dlc_packs:
-                owners[pack].append(mod.display_name)
-        return tuple(
-            Conflict(
-                conflict_type=ConflictType.DUPLICATE_DLC,
-                severity=ConflictSeverity.BLOCKING,
-                key=pack,
-                description=f"DLC pack '{pack}' is registered by: {', '.join(names)}",
-                owner=names[0],
+                owners[pack].append((mod.mod_id, mod.display_name))
+        conflicts: list[Conflict] = []
+        for pack, entries in sorted(owners.items()):
+            ids = tuple(dict.fromkeys(mod_id for mod_id, _ in entries))
+            if len(ids) < 2:
+                continue
+            names = tuple(dict.fromkeys(name for _, name in entries))
+            conflicts.append(
+                Conflict(
+                    conflict_type=ConflictType.DUPLICATE_DLC,
+                    severity=ConflictSeverity.BLOCKING,
+                    key=pack,
+                    description=f"DLC pack '{pack}' is registered by: {', '.join(names)}",
+                    owner=names[0],
+                    owner_mod_ids=ids,
+                    resolution_hint="Disable one of the conflicting mods",
+                )
             )
-            for pack, names in sorted(owners.items())
-            if len(names) > 1
-        )
+        return tuple(conflicts)
 
     @staticmethod
     def _multiple_gameconfigs(installed: tuple[InstalledMod, ...]) -> tuple[Conflict, ...]:
         """Return a conflict when several mods ship a ``gameconfig.xml``."""
         owners = [
-            mod.display_name
+            (mod.mod_id, mod.display_name)
             for mod in installed
             if any(
                 record.target_path.name.lower() == constants.GAMECONFIG_XML
@@ -175,14 +198,18 @@ class ConflictService:
         ]
         if len(owners) < 2:
             return ()
+        ids = tuple(mod_id for mod_id, _ in owners)
+        names = tuple(name for _, name in owners)
         return (
             Conflict(
                 conflict_type=ConflictType.DUPLICATE_GAMECONFIG,
                 severity=ConflictSeverity.BLOCKING,
                 key=constants.GAMECONFIG_XML,
                 description=f"{len(owners)} mods install a custom gameconfig.xml: "
-                + ", ".join(owners),
-                resolution_hint="Keep exactly one gameconfig mod installed",
+                + ", ".join(names),
+                owner=names[0],
+                owner_mod_ids=ids,
+                resolution_hint="Keep exactly one gameconfig — disable the extras",
             ),
         )
 
@@ -206,7 +233,8 @@ class ConflictService:
                         f"{mod.file_count} installed file(s)",
                         paths=tuple(missing[:10]),
                         owner=mod.display_name,
-                        resolution_hint="Reinstall the mod, or remove it from the library",
+                        owner_mod_ids=(mod.mod_id,),
+                        resolution_hint="Reinstall the mod, or disable / remove it",
                     )
                 )
         return tuple(conflicts)

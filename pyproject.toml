@@ -42,7 +42,7 @@ include = ["gta_mod_manager*"]
 "gta_mod_manager.gui.theme" = ["*.qss"]
 "gta_mod_manager.resources" = ["**/*"]
 "gta_mod_manager.resources.graphics" = ["**/*"]
-"gta_mod_manager.resources.graphics.cuongvision" = ["**/*"]
+"gta_mod_manager.resources.graphics.nccvision" = ["**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,4 +1,4 @@
-"""Install / switch / remove the bundled CuongVision ReShade pack.
+"""Install / switch / remove the bundled NCCVision ReShade pack.
 
 Designed for FPS-safe cinematic grades (no MXAO / DOF / ENB). Uses ReShade via
 ``ReShade.asi`` when an ASI loader exists, otherwise ``d3d11.dll``; legacy
@@ -39,7 +39,7 @@ _OWNED_FILES = (
     "ReShade.ini",
     "ReShadePreset.ini",
 )
-_OWNED_DIRS = (_SHADER_DIR, pack_files.INSTALL_MARKER_DIR)
+_OWNED_DIRS = (_SHADER_DIR, *pack_files.marker_dirs())
 _ENB_SERIES_MARKERS = ("enbseries.ini", "enblocal.ini")
 _ROAD_2K_URL = (
     "https://files.gta5-mods.com/uploads/roads-textures-2k/"
@@ -50,18 +50,19 @@ _ROAD_2K_SHA256 = "d7650417fc94ba88b5624d41885675ea78ba06184cb45347272c7d6dda8d5
 _ROAD_2K_RPF = "x64g.rpf"
 _ROAD_2K_NESTED = "levels/gta5/generic/gtxd.rpf"
 _ROAD_2K_MEMBERS = ("beverlyhillsrd.ytd", "beverlyhillsrd+hi.ytd")
-_ROAD_2K_MARKER = "cuongvision-road-2k.json"
+_ROAD_2K_MARKER = "nccvision-road-2k.json"
+_ROAD_2K_LEGACY_MARKERS = ("cuongvision-road-2k.json",)
 
 
 class GraphicsService:
-    """Manage the CuongVision cinematic pack on the active GTA V install."""
+    """Manage the NCCVision cinematic pack on the active GTA V install."""
 
     def __init__(self, game: GameService, paths: AppPaths | None = None) -> None:
         self._game = game
         self._paths = paths
 
     def status(self, install: GameInstall | None = None) -> Result[GraphicsStatus]:
-        """Return whether CuongVision is installed and at which level."""
+        """Return whether NCCVision is installed and at which level."""
         target = self._resolve(install)
         if target.is_error:
             return Result.fail(target.error or "No game", code=target.code)
@@ -73,7 +74,7 @@ class GraphicsService:
         )
         shaders = (root / _SHADER_DIR / "Shaders").is_dir()
         installed = bool(manifest) or (
-            injector and shaders and (root / pack_files.INSTALL_MARKER_DIR).is_dir()
+            injector and shaders and self._marker_dir(root) is not None
         )
         level: GraphicsLevel | None = None
         if manifest and manifest.get("level"):
@@ -84,13 +85,17 @@ class GraphicsService:
         conflict = self._has_enb_proxy(root)
         message = ""
         if conflict:
-            message = "ENB proxy DLL detected — disable ENB before using CuongVision"
+            message = "ENB proxy DLL detected — disable ENB before using NCCVision"
         elif installed and level is not None:
-            message = f"CuongVision active ({level.value})"
+            message = f"NCCVision active ({level.value})"
         elif installed:
-            message = "CuongVision files present"
+            message = "NCCVision files present"
         else:
-            message = "CuongVision not installed"
+            message = "NCCVision not installed"
+        marker = self._marker_dir(root)
+        preset = None
+        if marker is not None and (marker / "active.ini").is_file():
+            preset = marker / "active.ini"
         return Result.ok(
             GraphicsStatus(
                 pack_id=pack_files.PACK_ID,
@@ -98,11 +103,7 @@ class GraphicsService:
                 level=level,
                 injector_present=injector,
                 shaders_present=shaders,
-                preset_path=(
-                    root / pack_files.INSTALL_MARKER_DIR / "active.ini"
-                    if (root / pack_files.INSTALL_MARKER_DIR / "active.ini").is_file()
-                    else None
-                ),
+                preset_path=preset,
                 conflict_enb=conflict,
                 message=message,
             )
@@ -113,7 +114,7 @@ class GraphicsService:
         level: GraphicsLevel,
         install: GameInstall | None = None,
     ) -> Result[GraphicsStatus]:
-        """Install or re-apply CuongVision at ``level``."""
+        """Install or re-apply NCCVision at ``level``."""
         target = self._resolve(install)
         if target.is_error:
             return Result.fail(target.error or "No game", code=target.code)
@@ -130,7 +131,7 @@ class GraphicsService:
             return Result.fail(str(error), code="graphics.install_failed")
         except FileNotFoundError as error:
             return Result.fail(str(error), code="graphics.pack_missing")
-        _LOGGER.info("Installed CuongVision level=%s at %s", level.value, root)
+        _LOGGER.info("Installed NCCVision level=%s at %s", level.value, root)
         return self.status(target.unwrap())
 
     def set_level(
@@ -154,21 +155,21 @@ class GraphicsService:
             self._write_manifest(root, level)
         except OSError as error:
             return Result.fail(str(error), code="graphics.level_failed")
-        _LOGGER.info("Switched CuongVision to %s", level.value)
+        _LOGGER.info("Switched NCCVision to %s", level.value)
         return self.status(target.unwrap())
 
     def uninstall(self, install: GameInstall | None = None) -> Result[GraphicsStatus]:
-        """Remove CuongVision files owned by this manager."""
+        """Remove NCCVision files owned by this manager."""
         target = self._resolve(install)
         if target.is_error:
             return Result.fail(target.error or "No game", code=target.code)
         root = target.unwrap().root_path
         manifest = self._read_manifest(root)
         # Only delete injector if we installed it (manifest) or marker exists.
-        owned = bool(manifest) or (root / pack_files.INSTALL_MARKER_DIR).is_dir()
+        owned = bool(manifest) or self._marker_dir(root) is not None
         if not owned:
             return Result.fail(
-                "CuongVision is not installed by this manager",
+                "NCCVision is not installed by this manager",
                 code="graphics.not_installed",
             )
         try:
@@ -185,7 +186,7 @@ class GraphicsService:
                 log.unlink()
         except OSError as error:
             return Result.fail(str(error), code="graphics.uninstall_failed")
-        _LOGGER.info("Uninstalled CuongVision from %s", root)
+        _LOGGER.info("Uninstalled NCCVision from %s", root)
         return self.status(target.unwrap())
 
     def road_2k_installed(self, install: GameInstall | None = None) -> bool:
@@ -193,7 +194,11 @@ class GraphicsService:
         target = self._resolve(install)
         if target.is_error:
             return False
-        return (target.unwrap().mods_path / _ROAD_2K_MARKER).is_file()
+        mods = target.unwrap().mods_path
+        return any(
+            (mods / name).is_file()
+            for name in (_ROAD_2K_MARKER, *_ROAD_2K_LEGACY_MARKERS)
+        )
 
     def install_road_2k(self, install: GameInstall | None = None) -> Result[str]:
         """Download and install the selective 2K road textures into ``mods/x64g.rpf``."""
@@ -216,7 +221,7 @@ class GraphicsService:
             )
 
         created_copy = False
-        workspace = self._paths.temp / "cuongvision-road-2k"
+        workspace = self._paths.temp / "nccvision-road-2k"
         try:
             archive = self._road_2k_archive()
             if workspace.exists():
@@ -244,11 +249,13 @@ class GraphicsService:
                 for source in sources
             )
             import_members(mods_archive, imports)
+            for legacy in _ROAD_2K_LEGACY_MARKERS:
+                (game.mods_path / legacy).unlink(missing_ok=True)
             marker = game.mods_path / _ROAD_2K_MARKER
             marker.write_text(
                 json.dumps(
                     {
-                        "pack": "CuongVision Selective 2K Roads",
+                        "pack": "NCCVision Selective 2K Roads",
                         "version": "1.0",
                         "source": _ROAD_2K_URL,
                         "sha256": _ROAD_2K_SHA256,
@@ -280,8 +287,12 @@ class GraphicsService:
         if target.is_error:
             return Result.fail(target.error or "No game", code=target.code)
         game = target.unwrap()
-        marker = game.mods_path / _ROAD_2K_MARKER
-        if not marker.is_file():
+        markers = [
+            game.mods_path / name
+            for name in (_ROAD_2K_MARKER, *_ROAD_2K_LEGACY_MARKERS)
+            if (game.mods_path / name).is_file()
+        ]
+        if not markers:
             return Result.fail(
                 "The selective 2K road add-on is not installed",
                 code="graphics.road_2k_not_installed",
@@ -297,7 +308,8 @@ class GraphicsService:
                 members,
                 game_root=game.root_path,
             )
-            marker.unlink(missing_ok=True)
+            for marker in markers:
+                marker.unlink(missing_ok=True)
         except Exception as error:  # noqa: BLE001 - convert RPF errors to Result
             return Result.fail(str(error), code="graphics.road_2k_uninstall_failed")
 
@@ -366,6 +378,12 @@ class GraphicsService:
                 continue
             shutil.copy2(item, dst_shaders / item.name)
 
+        # Migrate away from the old CuongVision marker folder.
+        for legacy in pack_files.LEGACY_MARKER_DIRS:
+            old = root / legacy
+            if old.is_dir():
+                shutil.rmtree(old)
+
         marker = root / pack_files.INSTALL_MARKER_DIR
         marker.mkdir(parents=True, exist_ok=True)
         self._write_preset(root, level)
@@ -410,13 +428,13 @@ class GraphicsService:
             "owned_files": list(_OWNED_FILES),
             "owned_dirs": list(_OWNED_DIRS),
             "fps_safe": True,
-            "pack_version": "3.0-ultimate",
+            "pack_version": "3.1-ultimate",
             "injector": injector_name,
             "avoided_effects": ["MXAO", "DOF", "SSR", "ENB", "DepthBloom"],
             "detail_aa": {
                 "anti_aliasing": "SMAA color-edge only",
                 "sharpening": "AMD FidelityFX CAS",
-                "color_grade": "CuongCinematic highlight-safe rich color",
+                "color_grade": "NCCCinematic filmic teal/orange + soft bloom",
                 "depth_access": False,
             },
         }
@@ -425,14 +443,25 @@ class GraphicsService:
         path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
     def _read_manifest(self, root: Path) -> dict[str, object] | None:
-        path = root / pack_files.INSTALL_MARKER_DIR / pack_files.MANIFEST_NAME
-        if not path.is_file():
-            return None
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return None
-        return data if isinstance(data, dict) else None
+        for name in pack_files.marker_dirs():
+            path = root / name / pack_files.MANIFEST_NAME
+            if not path.is_file():
+                continue
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if isinstance(data, dict):
+                return data
+        return None
+
+    @staticmethod
+    def _marker_dir(root: Path) -> Path | None:
+        for name in pack_files.marker_dirs():
+            path = root / name
+            if path.is_dir():
+                return path
+        return None
 
     @staticmethod
     def _has_enb_proxy(root: Path) -> bool:
@@ -440,8 +469,10 @@ class GraphicsService:
         if any((root / name).is_file() for name in _ENB_SERIES_MARKERS):
             return True
         # Foreign d3d10/d3d9 proxies without our manifest are treated as ENB-like.
-        manifest = root / pack_files.INSTALL_MARKER_DIR / pack_files.MANIFEST_NAME
-        if manifest.is_file():
+        if any(
+            (root / name / pack_files.MANIFEST_NAME).is_file()
+            for name in pack_files.marker_dirs()
+        ):
             return False
         return (root / "d3d10.dll").is_file() or (
             (root / "d3d9.dll").is_file() and (root / "enbseries").is_dir()

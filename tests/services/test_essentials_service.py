@@ -73,6 +73,9 @@ def test_status_and_auto_install(tmp_path: Path, monkeypatch) -> None:  # noqa: 
     assert not before.ready
     assert "ScriptHookVDotNet" in before.auto_installable
     assert "NativeUI" in before.auto_installable
+    assert "Packfile Limit Adjuster" in before.browser_needed
+    assert "Heap Adjuster" in before.browser_needed
+    assert "Custom gameconfig.xml" in before.browser_needed
     assert any(item.action is EssentialAction.OPEN_BROWSER for item in before.items)
 
     after = service.install_auto().unwrap()

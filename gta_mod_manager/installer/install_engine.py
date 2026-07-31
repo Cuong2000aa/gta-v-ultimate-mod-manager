@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -13,9 +14,14 @@ from gta_mod_manager.core.progress import NullProgressReporter
 from gta_mod_manager.core.protocols import ProgressReporter
 from gta_mod_manager.installer.operations import OperationExecutor
 from gta_mod_manager.installer.transaction import Transaction
-from gta_mod_manager.models.enums import ModStatus
-from gta_mod_manager.models.install_plan import InstallPlan
-from gta_mod_manager.models.mod_package import InstalledFileRecord, InstalledMod, ModPackage
+from gta_mod_manager.models.enums import FileAction, ModStatus
+from gta_mod_manager.models.install_plan import FileOperation, InstallPlan
+from gta_mod_manager.models.mod_package import (
+    CachedArchiveMember,
+    InstalledFileRecord,
+    InstalledMod,
+    ModPackage,
+)
 from gta_mod_manager.models.vehicle import VehicleDefinition
 from gta_mod_manager.utils import fs
 from gta_mod_manager.validator.plan_validator import PlanValidator
@@ -23,6 +29,7 @@ from gta_mod_manager.validator.plan_validator import PlanValidator
 _LOGGER = get_logger("installer.engine")
 
 SCRATCH_DIR_NAME = "install-scratch"
+_RPF_MEMBER_CACHE = "rpf-members"
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,7 +114,9 @@ class InstallEngine:
                 if record is None:
                     skipped += 1
                 else:
-                    written.append(record)
+                    written.append(
+                        self._with_cached_payloads(plan.package_id, operation, record)
+                    )
                 reporter.advance(operation_id, index)
             transaction.commit()
 
@@ -152,8 +161,58 @@ class InstallEngine:
                     replaced_existing=existing.replaced_existing or record.replaced_existing,
                     shared_archive=True,
                     archive_members=existing.archive_members or record.archive_members,
+                    member_payloads=existing.member_payloads or record.member_payloads,
+                )
+            elif record.member_payloads and not existing.member_payloads:
+                by_path[key] = InstalledFileRecord(
+                    target_path=existing.target_path,
+                    sha256=record.sha256 or existing.sha256,
+                    replaced_existing=existing.replaced_existing or record.replaced_existing,
+                    shared_archive=existing.shared_archive or record.shared_archive,
+                    archive_members=existing.archive_members or record.archive_members,
+                    member_payloads=record.member_payloads,
                 )
         return tuple(by_path.values())
+
+    def _with_cached_payloads(
+        self,
+        mod_id: str,
+        operation: FileOperation,
+        record: InstalledFileRecord,
+    ) -> InstalledFileRecord:
+        """Copy RPF member sources into the library cache for later re-enable."""
+        if operation.action not in (FileAction.RPF_IMPORT, FileAction.RPF_PED_IMPORT):
+            return record
+        if not operation.archive_members:
+            return record
+
+        safe_id = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in mod_id) or "mod"
+        root = self._paths.library / _RPF_MEMBER_CACHE / safe_id
+        root.mkdir(parents=True, exist_ok=True)
+        cached: list[CachedArchiveMember] = []
+        for member in operation.archive_members:
+            source = member.source_path
+            if not source.is_file():
+                continue
+            safe_name = member.member_path.replace("\\", "/").replace("/", "__")
+            destination = root / safe_name
+            shutil.copy2(source, destination)
+            cached.append(
+                CachedArchiveMember(
+                    member_path=member.member_path,
+                    library_relative=f"{_RPF_MEMBER_CACHE}/{safe_id}/{safe_name}",
+                )
+            )
+        if not cached:
+            return record
+        return InstalledFileRecord(
+            target_path=record.target_path,
+            sha256=record.sha256,
+            replaced_existing=record.replaced_existing,
+            shared_archive=record.shared_archive,
+            archive_members=record.archive_members,
+            member_payloads=tuple(cached),
+        )
 
     @staticmethod
     def _build_record(

@@ -123,6 +123,34 @@ class EssentialsService:
                 detail=f"Pinned Guad NativeUI {_NATIVEUI_VERSION} into scripts/.",
                 homepage="https://github.com/Guad/NativeUI/releases/tag/1.9.1",
             ),
+            self._item(
+                by_id,
+                constants.COMPONENT_PACKFILE_LIMIT_ADJUSTER,
+                "Packfile Limit Adjuster",
+                installed=(root / "PackfileLimitAdjuster.asi").is_file(),
+                action=EssentialAction.OPEN_BROWSER,
+                detail="Needed for large add-on / map packs — copy the .asi into the game root.",
+            ),
+            self._item(
+                by_id,
+                constants.COMPONENT_HEAP_ADJUSTER,
+                "Heap Adjuster",
+                installed=(root / "GTAVHeapAdjuster.asi").is_file()
+                or (root / "HeapAdjuster.asi").is_file(),
+                action=EssentialAction.OPEN_BROWSER,
+                detail="Raises memory ceiling for big Story Mode collections.",
+            ),
+            self._item(
+                by_id,
+                constants.COMPONENT_GAMECONFIG,
+                "Custom gameconfig.xml",
+                installed=self._gameconfig_installed(game),
+                action=EssentialAction.OPEN_BROWSER,
+                detail=(
+                    "Use a gameconfig matching your GTA build; install via OpenIV into "
+                    "mods/update/update.rpf (common/data/gameconfig.xml)."
+                ),
+            ),
         )
 
         auto = tuple(
@@ -141,7 +169,7 @@ class EssentialsService:
         )
         ready = all(item.installed for item in items)
         if ready:
-            message = "All Story Mode essentials are present."
+            message = "All Story Mode essentials and stability tools are present."
         else:
             parts: list[str] = []
             if folder_missing:
@@ -150,7 +178,7 @@ class EssentialsService:
                 parts.append("auto-install " + ", ".join(auto))
             if browser:
                 parts.append("download manually " + ", ".join(browser))
-            message = "Missing essentials — " + "; ".join(parts) + "."
+            message = "Missing essentials / stability tools — " + "; ".join(parts) + "."
         return Result.ok(
             EssentialsStatus(
                 items=items,
@@ -183,7 +211,7 @@ class EssentialsService:
         return self.status(game)
 
     def open_manual_pages(self, install: GameInstall | None = None) -> Result[EssentialsStatus]:
-        """Open browser tabs for essentials that cannot be redistributed."""
+        """Open browser tabs for essentials / stability tools we cannot redistribute."""
         status = self.status(install)
         if status.is_error:
             return status
@@ -202,6 +230,23 @@ class EssentialsService:
             value=current,
             warnings=(f"Opened {len(opened)} download page(s) in your browser.",),
         )
+
+    @staticmethod
+    def _gameconfig_installed(game: GameInstall) -> bool:
+        """Return whether a custom gameconfig is present under mods/."""
+        loose = (
+            game.mods_path
+            / "update"
+            / "update.rpf"
+            / "common"
+            / "data"
+            / constants.GAMECONFIG_XML
+        )
+        if loose.is_file():
+            return True
+        # Also treat a library-tracked gameconfig install as present.
+        tracked = game.mods_path / "update" / "common" / "data" / constants.GAMECONFIG_XML
+        return tracked.is_file()
 
     def _install_shvdn(self, root: Path) -> None:
         archive = self._cached_archive(

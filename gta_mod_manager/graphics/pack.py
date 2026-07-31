@@ -1,4 +1,4 @@
-"""Locate the bundled CuongVision graphics pack on disk."""
+"""Locate the bundled NCCVision graphics pack on disk."""
 
 from __future__ import annotations
 
@@ -6,27 +6,29 @@ from pathlib import Path
 
 from gta_mod_manager.models.graphics import GraphicsLevel, GraphicsPackInfo
 
-PACK_ID = "cuongvision"
+PACK_ID = "nccvision"
 MANIFEST_NAME = "manager_manifest.json"
-INSTALL_MARKER_DIR = "CuongVision"
+INSTALL_MARKER_DIR = "NCCVision"
+#: Previous brand folder — still cleaned on uninstall / treated as installed.
+LEGACY_MARKER_DIRS: tuple[str, ...] = ("CuongVision",)
 
 
 def pack_info() -> GraphicsPackInfo:
     """Return metadata for the bundled pack."""
     return GraphicsPackInfo(
         pack_id=PACK_ID,
-        display_name="CuongVision",
-        description_key="graphics.pack.cuongvision.desc",
+        display_name="NCCVision",
+        description_key="graphics.pack.nccvision.desc",
         levels=(GraphicsLevel.CINEMATIC_DETAIL_AA,),
     )
 
 
 def pack_root() -> Path:
-    """Return the filesystem path of the bundled CuongVision pack."""
-    root = Path(__file__).resolve().parents[1] / "resources" / "graphics" / "cuongvision"
+    """Return the filesystem path of the bundled NCCVision pack."""
+    root = Path(__file__).resolve().parents[1] / "resources" / "graphics" / "nccvision"
     if root.is_dir():
         return root
-    raise FileNotFoundError("CuongVision graphics pack is missing from resources")
+    raise FileNotFoundError("NCCVision graphics pack is missing from resources")
 
 
 def injector_dll() -> Path:
@@ -53,3 +55,8 @@ def preset_path(level: GraphicsLevel) -> Path:
     if not path.is_file():
         raise FileNotFoundError(f"Missing preset: {path}")
     return path
+
+
+def marker_dirs() -> tuple[str, ...]:
+    """Return current and legacy install marker folder names."""
+    return (INSTALL_MARKER_DIR, *LEGACY_MARKER_DIRS)

@@ -23,12 +23,16 @@ from gta_mod_manager.installer.uninstaller import Uninstaller, UninstallOutcome
 from gta_mod_manager.models.backup_snapshot import OperationRecord
 from gta_mod_manager.models.enums import ModStatus, OperationKind, OperationStatus
 from gta_mod_manager.models.game_install import GameInstall
+from gta_mod_manager.models.install_plan import ArchiveMemberImport
 from gta_mod_manager.models.mod_package import InstalledFileRecord, InstalledMod
 from gta_mod_manager.plugins.gta_v.addon_peds import (
     PED_META_MEMBER_PREFIX,
+    import_addon_peds,
     remove_addon_peds,
 )
 from gta_mod_manager.plugins.gta_v.rpf_archive import (
+    append_dlclist_entries,
+    import_members,
     remove_dlclist_entries,
     restore_stock_members,
     stock_archive_for_mods_copy,
@@ -40,6 +44,7 @@ from gta_mod_manager.utils import fs
 
 _LOGGER = get_logger("services.library")
 _DISABLED_QUARANTINE = "disabled-mods"
+_RPF_MEMBER_CACHE = "rpf-members"
 
 
 @dataclass(frozen=True, slots=True)
@@ -198,6 +203,7 @@ class LibraryService:
 
         reporter.finish(operation_id, f"Removed {mod.display_name}")
         self._clear_quarantine(mod_id)
+        self._clear_member_payloads(mod_id)
         self._mods.remove(mod_id)
         self._backup_repository.add_operation(record.completed(OperationStatus.SUCCEEDED))
         self._bus.publish(ModLibraryChangedEvent(reason="uninstalled"))
@@ -424,9 +430,8 @@ class LibraryService:
         """Physically enable or disable a mod by quarantining its loose files.
 
         Disable moves non-shared files under the app backup folder and reverts
-        shared ``.rpf`` members. Enable restores quarantined files. Shared
-        archive content is not re-applied on enable — reinstall the mod to
-        put add-on / replace models back.
+        shared ``.rpf`` members. Enable restores quarantined files and re-imports
+        cached shared-archive payloads when available.
         """
         mod = self._mods.get(mod_id)
         if mod is None:
@@ -469,10 +474,16 @@ class LibraryService:
                     mod, reporter
                 )
                 warnings.extend(shared_warnings)
-                warnings.append(
-                    "Shared archive models were restored to stock. "
-                    "Reinstall this mod after enabling to put them back."
-                )
+                if any(item.member_payloads for item in shared):
+                    warnings.append(
+                        "Shared archive models were restored to stock. "
+                        "Enable will re-apply the cached payloads."
+                    )
+                else:
+                    warnings.append(
+                        "Shared archive models were restored to stock. "
+                        "This install has no cached payloads — reinstall after enabling."
+                    )
                 step += 1
             reporter.advance(operation_id, step, "Updating library status")
             updated = self._mods.update_status(mod.mod_id, ModStatus.DISABLED)
@@ -502,12 +513,18 @@ class LibraryService:
     ) -> Result[InstalledMod]:
         plain = [item for item in mod.installed_files if not item.shared_archive]
         has_shared = any(item.shared_archive for item in mod.installed_files)
-        reporter.start(operation_id, f"Enabling {mod.display_name}", total=2)
+        total = 2 + int(has_shared)
+        reporter.start(operation_id, f"Enabling {mod.display_name}", total=total)
         warnings: list[str] = []
         try:
             reporter.advance(operation_id, 0, "Restoring loose files into the game folder")
             restored = self._restore_plain_files(mod, plain)
-            reporter.advance(operation_id, 1, "Updating library status")
+            step = 1
+            if has_shared:
+                reporter.advance(operation_id, step, "Re-applying shared archive models")
+                warnings.extend(self._reapply_shared_archives(mod))
+                step += 1
+            reporter.advance(operation_id, step, "Updating library status")
             updated = self._mods.update_status(mod.mod_id, ModStatus.INSTALLED)
             if updated is None:
                 raise InstallError("Could not update mod status")
@@ -515,11 +532,6 @@ class LibraryService:
             reporter.finish(operation_id, f"Could not enable {mod.display_name}")
             return Result.fail(str(error), code="library.enable_failed")
 
-        if has_shared:
-            warnings.append(
-                "Shared archive content was not re-applied. Reinstall the mod "
-                "to restore add-on / replace models inside mods/*.rpf."
-            )
         reporter.finish(
             operation_id,
             f"Enabled {mod.display_name} ({restored} file(s) restored)",
@@ -532,7 +544,80 @@ class LibraryService:
                 level=NotificationLevel.SUCCESS,
             )
         )
-        return Result(value=updated, warnings=tuple(warnings))
+        return Result(value=updated, warnings=tuple(dict.fromkeys(warnings)))
+
+    def _reapply_shared_archives(self, mod: InstalledMod) -> tuple[str, ...]:
+        """Re-import this mod's cached shared-archive edits after a physical enable."""
+        warnings: list[str] = []
+        for record in mod.installed_files:
+            if not record.shared_archive:
+                continue
+            dlc_packs = tuple(
+                member[len("dlclist:") :]
+                for member in record.archive_members
+                if member.startswith("dlclist:")
+            )
+            if dlc_packs:
+                if not record.target_path.is_file():
+                    warnings.append(
+                        f"Cannot re-register DLC packs — missing {record.target_path.name}"
+                    )
+                else:
+                    appended = append_dlclist_entries(record.target_path, dlc_packs)
+                    _LOGGER.info(
+                        "Re-registered %d DLC pack(s) for %s", appended, mod.display_name
+                    )
+
+            if not record.member_payloads:
+                stock_members = tuple(
+                    member
+                    for member in record.archive_members
+                    if not member.startswith("dlclist:")
+                    and not member.startswith(PED_META_MEMBER_PREFIX)
+                )
+                if stock_members:
+                    warnings.append(
+                        f"No cached payloads for {record.target_path.name}; "
+                        "reinstall the mod to restore shared archive models."
+                    )
+                continue
+
+            imports: list[ArchiveMemberImport] = []
+            for payload in record.member_payloads:
+                source = self._paths.library / payload.library_relative
+                if not source.is_file():
+                    warnings.append(f"Missing cached payload: {payload.member_path}")
+                    continue
+                imports.append(
+                    ArchiveMemberImport(
+                        source_path=source, member_path=payload.member_path
+                    )
+                )
+            if not imports:
+                continue
+            if not record.target_path.is_file() and "umm_peds" not in str(
+                record.target_path
+            ).lower():
+                warnings.append(
+                    f"Cannot re-import into missing archive {record.target_path.name}"
+                )
+                continue
+
+            is_ped = any(
+                member.startswith(PED_META_MEMBER_PREFIX)
+                for member in record.archive_members
+            ) or "umm_peds" in str(record.target_path).lower()
+            try:
+                if is_ped:
+                    import_addon_peds(record.target_path, imports)
+                else:
+                    import_members(record.target_path, tuple(imports))
+            except Exception as error:  # noqa: BLE001 - surface as enable warning
+                warnings.append(
+                    f"Could not re-apply shared archive content in "
+                    f"{record.target_path.name}: {error}"
+                )
+        return tuple(warnings)
 
     def _quarantine_plain_files(
         self, mod: InstalledMod, records: list[InstalledFileRecord]
@@ -615,6 +700,12 @@ class LibraryService:
         quarantine = self._quarantine_root(mod_id)
         if quarantine.exists():
             shutil.rmtree(quarantine, ignore_errors=True)
+
+    def _clear_member_payloads(self, mod_id: str) -> None:
+        safe = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in mod_id)
+        cache = self._paths.library / _RPF_MEMBER_CACHE / (safe or "mod")
+        if cache.exists():
+            shutil.rmtree(cache, ignore_errors=True)
 
     @staticmethod
     def _is_under_game(game_root: Path, target: Path) -> bool:

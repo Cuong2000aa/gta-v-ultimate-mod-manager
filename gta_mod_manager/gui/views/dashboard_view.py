@@ -161,7 +161,7 @@ class DashboardView(QWidget):
         card.body.addWidget(self._essentials_status)
 
         self._essentials_list = QListWidget()
-        self._essentials_list.setMinimumHeight(120)
+        self._essentials_list.setMinimumHeight(180)
         card.body.addWidget(self._essentials_list)
 
         actions = QHBoxLayout()
