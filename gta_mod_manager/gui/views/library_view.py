@@ -36,10 +36,10 @@ from gta_mod_manager.services.library_service import ModSummary
 _MOD_ID_ROLE = Qt.ItemDataRole.UserRole
 
 _STATUS_BADGES: dict[ModStatus, tuple[str, str]] = {
-    ModStatus.INSTALLED: ("Installed", BADGE_OK),
-    ModStatus.DISABLED: ("Disabled", BADGE_NEUTRAL),
-    ModStatus.BROKEN: ("Broken", BADGE_ERROR),
-    ModStatus.AVAILABLE: ("Available", BADGE_NEUTRAL),
+    ModStatus.INSTALLED: ("library.status_installed", BADGE_OK),
+    ModStatus.DISABLED: ("library.status_disabled", BADGE_NEUTRAL),
+    ModStatus.BROKEN: ("library.status_broken", BADGE_ERROR),
+    ModStatus.AVAILABLE: ("library.status_available", BADGE_NEUTRAL),
 }
 
 
@@ -68,7 +68,7 @@ class LibraryView(QWidget):
         """Render a progress event while this page owns the running command."""
         if not self._busy:
             return
-        self._progress_label.setText(label or "Working...")
+        self._progress_label.setText(label or t("library.working"))
         self._progress_label.setVisible(True)
         self._progress.setVisible(True)
         if total > 0:
@@ -77,7 +77,7 @@ class LibraryView(QWidget):
             self._progress.setFormat("%p%")
         else:
             self._progress.setRange(0, 0)
-            self._progress.setFormat("Working...")
+            self._progress.setFormat(t("library.working"))
 
     def _on_status(self, message: str) -> None:
         """Mirror status lines onto the progress label while busy."""
@@ -173,7 +173,9 @@ class LibraryView(QWidget):
 
         self._files = QTreeWidget()
         self._files.setColumnCount(2)
-        self._files.setHeaderLabels(["Installed content", "State"])
+        self._files.setHeaderLabels(
+            [t("library.files_header"), t("library.files_state")]
+        )
         self._files.setAlternatingRowColors(True)
         self._files.setRootIsDecorated(True)
         self._files.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
@@ -208,7 +210,8 @@ class LibraryView(QWidget):
         self._table.clear()
 
         for summary in summaries:
-            label, _kind = _STATUS_BADGES[summary.mod.status]
+            label_key, _kind = _STATUS_BADGES[summary.mod.status]
+            label = t(label_key)
             spawn = ", ".join(summary.mod.spawn_codes) if summary.mod.spawn_codes else "—"
             item = QTreeWidgetItem(
                 [
@@ -217,15 +220,17 @@ class LibraryView(QWidget):
                     spawn,
                     str(summary.mod.file_count),
                     summary.size_label,
-                    label if summary.is_intact else "Files missing",
+                    label if summary.is_intact else t("library.status_files_missing"),
                 ]
             )
             item.setData(0, _MOD_ID_ROLE, summary.mod_id)
             if summary.mod.spawn_codes:
                 item.setToolTip(
                     2,
-                    "Type this in a trainer (Menyoo / Simple Trainer) to spawn the vehicle:\n"
-                    + "\n".join(summary.mod.spawn_codes),
+                    t(
+                        "library.spawn_tip",
+                        codes="\n".join(summary.mod.spawn_codes),
+                    ),
                 )
             self._table.addTopLevelItem(item)
             if summary.mod_id == selected:
@@ -249,10 +254,11 @@ class LibraryView(QWidget):
 
         self._current_mod_id = summary.mod_id
         mod = summary.mod
-        label, badge = _STATUS_BADGES[mod.status]
+        label_key, badge = _STATUS_BADGES[mod.status]
+        label = t(label_key)
         self._name_label.setText(mod.display_name)
         self._status_badge.set_state(
-            label if summary.is_intact else "Files missing",
+            label if summary.is_intact else t("library.status_files_missing"),
             badge if summary.is_intact else BADGE_WARNING,
         )
         self._meta_label.setText(
@@ -424,7 +430,7 @@ class LibraryView(QWidget):
         self._progress_label.setText(label)
         self._progress_label.setVisible(True)
         self._progress.setRange(0, 0)
-        self._progress.setFormat("Working...")
+        self._progress.setFormat(t("library.working"))
         self._progress.setVisible(True)
 
     def _stop_progress(self) -> None:

@@ -14,6 +14,27 @@ from gta_mod_manager.services.nexus_mods_client import NexusModsClient
 from gta_mod_manager.services.online_mod_service import OnlineModService, delete_owned_download
 
 
+def test_gta5mods_category_browse_url(monkeypatch) -> None:
+    captured: dict[str, str] = {}
+
+    def fake_request_text(url: str, **_kwargs):  # noqa: ANN003
+        captured["url"] = url
+        return "<html></html>"
+
+    monkeypatch.setattr(http_client, "request_text", fake_request_text)
+    result = Gta5ModsClient().search("", category="weapons")
+    assert result.is_ok
+    assert captured["url"].endswith("/weapons/most-downloaded")
+
+    result = Gta5ModsClient().search("", category="maps")
+    assert result.is_ok
+    assert captured["url"].endswith("/maps/most-downloaded")
+
+    result = Gta5ModsClient().search("adder", category="weapons")
+    assert result.is_ok
+    assert "/search/" in captured["url"]
+
+
 def test_gta5mods_parses_search_cards() -> None:
     html = """
     <html><body>

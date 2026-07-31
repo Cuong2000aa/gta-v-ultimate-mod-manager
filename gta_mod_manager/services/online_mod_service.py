@@ -52,12 +52,18 @@ class OnlineModService:
         self._progress = progress
         self._gta5mods = Gta5ModsClient()
 
-    def search(self, source: OnlineSource, query: str) -> Result[OnlineSearchResult]:
-        """Search ``source`` (empty query = trending / popular feed)."""
+    def search(
+        self,
+        source: OnlineSource,
+        query: str,
+        *,
+        category: str | None = None,
+    ) -> Result[OnlineSearchResult]:
+        """Search ``source`` (empty query = category / trending feed)."""
         if source is OnlineSource.NEXUS:
             return self._nexus().search(query)
         if source is OnlineSource.GTA5_MODS:
-            return self._gta5mods.search(query)
+            return self._gta5mods.search(query, category=category)
         return Result.fail("Choose Nexus Mods or GTA5-Mods", code="online.bad_source")
 
     def download_listing(self, listing: OnlineModListing) -> Result[OnlineDownloadResult]:

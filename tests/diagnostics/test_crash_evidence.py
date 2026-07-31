@@ -190,10 +190,14 @@ def test_script_errors_are_mapped_to_the_owning_mod(tmp_path: Path) -> None:
     assert "Simple Zombie Mod" in errors[0].title
     assert errors[0].severity is DiagnosticSeverity.ERROR
     assert "NullReferenceException" in errors[0].evidence
+    assert errors[0].fix_action == "disable_mods"
+    assert errors[0].fix_targets == ("simple zombie mod",)
 
     loads = [f for f in report.findings if f.code == "crash.script_load"]
     assert len(loads) == 1
     assert "PedSelector.dll" in loads[0].title
+    assert loads[0].fix_action == ""
+    assert loads[0].fix_targets == ()
 
     # The most urgent suspect should be the crashing script, not the load failure.
     assert report.top_suspect is not None
@@ -238,8 +242,10 @@ def test_recently_installed_mods_are_listed_as_suspects(tmp_path: Path) -> None:
 
     recent = [f for f in report.findings if f.code == "crash.recent_mods"]
     assert len(recent) == 1
-    assert "Fresh Mod" in recent[0].fix_targets
-    assert "Ancient Mod" not in recent[0].fix_targets
+    assert recent[0].fix_action == "disable_mods"
+    assert "fresh mod" in recent[0].fix_targets
+    assert "ancient mod" not in recent[0].fix_targets
+    assert "Fresh Mod" in recent[0].detail
 
 
 def test_crash_without_evidence_yields_isolation_advice(tmp_path: Path) -> None:

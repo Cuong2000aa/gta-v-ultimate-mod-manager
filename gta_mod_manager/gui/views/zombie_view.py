@@ -6,7 +6,15 @@ from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWi
 
 from gta_mod_manager.gui.i18n import t
 from gta_mod_manager.gui.viewmodels.zombie_vm import ZombieViewModel
-from gta_mod_manager.gui.widgets.cards import Card, page_header
+from gta_mod_manager.gui.widgets.cards import (
+    BADGE_ERROR,
+    BADGE_NEUTRAL,
+    BADGE_OK,
+    BADGE_WARNING,
+    Badge,
+    Card,
+    page_header,
+)
 from gta_mod_manager.models.zombie import ZombieModeStatus
 
 
@@ -32,10 +40,16 @@ class ZombieView(QWidget):
         layout.setSpacing(16)
         layout.addWidget(page_header(t("zombie.title"), t("zombie.subtitle")))
 
-        self._badge = QLabel(t("zombie.checking"))
-        self._badge.setObjectName("Hint")
-        self._badge.setWordWrap(True)
-        layout.addWidget(self._badge)
+        status_row = QHBoxLayout()
+        self._badge = Badge(t("zombie.checking"), BADGE_NEUTRAL)
+        status_row.addWidget(self._badge)
+        status_row.addStretch(1)
+        layout.addLayout(status_row)
+
+        self._badge_detail = QLabel("")
+        self._badge_detail.setObjectName("Hint")
+        self._badge_detail.setWordWrap(True)
+        layout.addWidget(self._badge_detail)
 
         pack = Card(t("zombie.card_mode"))
         description = QLabel(t("zombie.description"))
@@ -81,18 +95,24 @@ class ZombieView(QWidget):
         if not isinstance(status, ZombieModeStatus):
             return
         if status.ready:
-            self._badge.setText(t("zombie.ready", version=status.version or ""))
+            self._badge.set_state(t("zombie.badge_ready"), BADGE_OK)
+            self._badge_detail.setText(
+                t("zombie.ready", version=status.version or "")
+            )
         elif status.installed:
             missing = ", ".join(status.missing_dependencies)
-            self._badge.setText(t("zombie.missing", dependencies=missing))
+            self._badge.set_state(t("zombie.badge_missing"), BADGE_WARNING)
+            self._badge_detail.setText(t("zombie.missing", dependencies=missing))
         else:
-            self._badge.setText(t("zombie.not_installed"))
+            self._badge.set_state(t("zombie.badge_not_installed"), BADGE_NEUTRAL)
+            self._badge_detail.setText(t("zombie.not_installed"))
         self._status.setText(status.message)
         self._uninstall.setEnabled(status.installed)
         self._launch.setEnabled(status.ready)
 
     def _on_error(self, message: str) -> None:
-        self._badge.setText(t("zombie.error"))
+        self._badge.set_state(t("zombie.badge_error"), BADGE_ERROR)
+        self._badge_detail.setText(t("zombie.error"))
         self._status.setText(message)
 
     def _on_busy(self, busy: bool) -> None:

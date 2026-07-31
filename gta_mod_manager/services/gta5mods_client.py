@@ -51,11 +51,33 @@ _SKIP_SLUGS = frozenset({"tags", "user", "users", "login", "register"})
 class Gta5ModsClient:
     """Search GTA5-Mods and attempt to resolve a direct archive URL."""
 
-    def search(self, query: str, *, limit: int = 25) -> Result[OnlineSearchResult]:
-        """Return catalogue cards for ``query`` (or a popular feed)."""
+    #: Category slugs that expose a ``/{category}/most-downloaded`` feed.
+    BROWSE_CATEGORIES: tuple[str, ...] = (
+        "vehicles",
+        "weapons",
+        "maps",
+        "scripts",
+        "player",
+        "misc",
+        "tools",
+    )
+
+    def search(
+        self,
+        query: str,
+        *,
+        limit: int = 25,
+        category: str | None = None,
+    ) -> Result[OnlineSearchResult]:
+        """Return catalogue cards for ``query`` or a category popular feed."""
         cleaned = query.strip()
+        browse = (category or "").strip().lower()
+        if browse == "all":
+            browse = ""
         if cleaned:
             url = f"{constants.GTA5MODS_SITE_BASE}/search/{quote(cleaned)}"
+        elif browse in self.BROWSE_CATEGORIES:
+            url = f"{constants.GTA5MODS_SITE_BASE}/{browse}/most-downloaded"
         else:
             url = f"{constants.GTA5MODS_SITE_BASE}/vehicles/most-downloaded"
         try:

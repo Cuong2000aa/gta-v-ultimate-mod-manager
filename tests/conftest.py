@@ -117,6 +117,82 @@ def addon_vehicle_zip(tmp_path: Path) -> Path:
     return archive
 
 
+def _addon_dlc_zip(
+    archive: Path,
+    *,
+    pack_name: str,
+    data_files: dict[str, str],
+    readme: str,
+) -> Path:
+    """Write a minimal add-on DLC archive with the given data files."""
+    setup2 = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        "<SSetupData>\n"
+        f"  <deviceName>dlc_{pack_name}</deviceName>\n"
+        "  <datFile>content.xml</datFile>\n"
+        f"  <nameHash>{pack_name}</nameHash>\n"
+        "  <order value='30'/>\n"
+        "</SSetupData>\n"
+    )
+    content = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        "<CDataFileMgr__ContentsOfDataFileXml>\n"
+        "  <dataFiles>\n"
+        "    <Item>\n"
+        f"      <filename>dlc_{pack_name}:/%PLATFORM%/data.rpf</filename>\n"
+        "      <fileType>RPF_FILE</fileType>\n"
+        "    </Item>\n"
+        "  </dataFiles>\n"
+        "</CDataFileMgr__ContentsOfDataFileXml>\n"
+    )
+    base = f"{pack_name}/"
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.writestr(f"{base}setup2.xml", setup2)
+        bundle.writestr(f"{base}content.xml", content)
+        bundle.writestr(f"{base}dlc.rpf", b"fake pack payload")
+        for relative, payload in data_files.items():
+            bundle.writestr(f"{base}{relative}", payload)
+        bundle.writestr("readme.txt", readme)
+    return archive
+
+
+@pytest.fixture()
+def addon_weapon_zip(tmp_path: Path) -> Path:
+    """Return a zip shaped like an add-on weapon DLC pack."""
+    weapons_meta = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        "<CWeaponInfoBlob>\n"
+        "  <Infos>\n"
+        "    <Item>\n"
+        "      <Name>WEAPON_DEMO</Name>\n"
+        "    </Item>\n"
+        "  </Infos>\n"
+        "</CWeaponInfoBlob>\n"
+    )
+    return _addon_dlc_zip(
+        tmp_path / "Demo Weapon Addon.zip",
+        pack_name="demogun",
+        data_files={
+            "data/weapons.meta": weapons_meta,
+            "stream/w_demo.ydr": "fake weapon mesh",
+        },
+        readme="Add-on weapon. Add dlcpacks:/demogun/ to dlclist.xml.\n",
+    )
+
+
+@pytest.fixture()
+def addon_map_zip(tmp_path: Path) -> Path:
+    """Return a zip shaped like an add-on map DLC pack."""
+    return _addon_dlc_zip(
+        tmp_path / "Demo Map Addon.zip",
+        pack_name="demomap",
+        data_files={
+            "x64/levels/gta5/custom_maps/demo.ymap": "fake ymap",
+            "x64/levels/gta5/custom_maps/demo.ytyp": "fake ytyp",
+        },
+        readme="Add-on map. Add dlcpacks:/demomap/ to dlclist.xml.\n",
+    )
+
 @pytest.fixture()
 def asi_mod_zip(tmp_path: Path) -> Path:
     """Return a zip containing an ASI plugin destined for the game root."""

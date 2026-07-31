@@ -92,6 +92,7 @@ class MainWindow(QMainWindow):
             app.backups,
             self,
             launch=app.launch,
+            essentials=app.essentials,
         )
         self._install_vm = InstallViewModel(
             self._runner,

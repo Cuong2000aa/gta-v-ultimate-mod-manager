@@ -35,7 +35,7 @@ from gta_mod_manager.gui.widgets.cards import (
     page_header,
 )
 from gta_mod_manager.gui.widgets.drop_area import DropArea
-from gta_mod_manager.models.enums import ConflictSeverity, InstallTarget
+from gta_mod_manager.models.enums import ConflictSeverity, InstallTarget, ModKind
 from gta_mod_manager.services.install_service import InstallPreview
 from gta_mod_manager.utils import fs
 
@@ -49,6 +49,31 @@ _ZONE_KEYS: dict[str, str] = {
     InstallTarget.GAME_ROOT.value: "install.zone_root",
     InstallTarget.EXTERNAL.value: "install.zone_external",
 }
+
+_KIND_KEYS: dict[ModKind, str] = {
+    ModKind.VEHICLE_ADDON: "install.kind_vehicle_addon",
+    ModKind.VEHICLE_REPLACE: "install.kind_vehicle_replace",
+    ModKind.PED: "install.kind_ped",
+    ModKind.WEAPON: "install.kind_weapon",
+    ModKind.MAP: "install.kind_map",
+    ModKind.SCRIPT: "install.kind_script",
+    ModKind.ASI: "install.kind_asi",
+    ModKind.SCRIPT_HOOK_DOTNET: "install.kind_script_hook_dotnet",
+    ModKind.GRAPHICS: "install.kind_graphics",
+    ModKind.LML: "install.kind_lml",
+    ModKind.OPENIV_PACKAGE: "install.kind_openiv_package",
+    ModKind.MENYOO: "install.kind_menyoo",
+    ModKind.TRAINER: "install.kind_trainer",
+    ModKind.ZOMBIE: "install.kind_zombie",
+    ModKind.SOUND: "install.kind_sound",
+    ModKind.TEXTURE: "install.kind_texture",
+    ModKind.UNKNOWN: "install.kind_unknown",
+}
+
+
+def _kind_label(kind: ModKind) -> str:
+    """Return a friendly i18n label for an analyzer kind."""
+    return t(_KIND_KEYS.get(kind, "install.kind_unknown"))
 
 
 def _spawn_source_label(source: Path | None) -> str:
@@ -187,7 +212,7 @@ class InstallView(QWidget):
         self._vehicles = QTreeWidget()
         self._vehicles.setColumnCount(4)
         self._vehicles.setHeaderLabels(
-            [t("library.col_spawn"), "Source", "Handling", "Manufacturer"]
+            [t("library.col_spawn"), t("install.col_vehicle_source"), t("install.col_vehicle_handling"), t("install.col_vehicle_make")]
         )
         self._vehicles.setRootIsDecorated(False)
         self._vehicles.setAlternatingRowColors(True)
@@ -256,8 +281,15 @@ class InstallView(QWidget):
         self._splitter.setVisible(True)
         self._name_label.setText(package.display_name)
         self._kind_badge.set_state(
-            f"{classification.primary.display_name} - {classification.score:.0%}",
+            _kind_label(classification.primary),
             BADGE_OK if classification.is_reliable else BADGE_WARNING,
+        )
+        self._kind_badge.setToolTip(
+            t(
+                "install.kind_confidence",
+                kind=_kind_label(classification.primary),
+                confidence=f"{classification.score:.0%}",
+            )
         )
         self._summary_label.setText(
             t(

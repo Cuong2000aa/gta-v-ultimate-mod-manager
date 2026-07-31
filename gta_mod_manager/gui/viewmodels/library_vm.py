@@ -88,11 +88,21 @@ class LibraryViewModel(ViewModel):
         self.run_result(work, done)
 
     def set_enabled(self, mod_id: str, enabled: bool) -> None:
-        """Enable or disable a mod in the library."""
-        def work() -> Result[InstalledMod]:
-            return self._library.set_enabled(mod_id, enabled)
+        """Physically enable or disable a mod and refresh the list."""
+        self.statusChanged.emit(
+            "Enabling mod..." if enabled else "Disabling mod (moving files)..."
+        )
 
-        self.run_result(work, lambda _mod: self.refresh())
+        def work() -> Result[InstalledMod]:
+            return self._library.set_enabled(
+                mod_id, enabled, reporter=self._reporter
+            )
+
+        def done(_mod: InstalledMod) -> None:
+            self.statusChanged.emit("Mod enabled" if enabled else "Mod disabled")
+            self.refresh()
+
+        self.run_result(work, done, on_warnings=self._warn)
 
     def _publish(self, summaries: tuple[ModSummary, ...]) -> None:
         """Emit the loaded list and a short status line."""

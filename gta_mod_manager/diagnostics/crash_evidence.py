@@ -26,6 +26,7 @@ from pathlib import Path
 
 from gta_mod_manager.core.logging_setup import get_logger
 from gta_mod_manager.models.crash_report import GameSessionReport
+from gta_mod_manager.diagnostics.actions import FIX_DISABLE_MODS
 from gta_mod_manager.models.diagnostic import DiagnosticFinding, DiagnosticSeverity
 from gta_mod_manager.models.mod_package import InstalledMod
 
@@ -242,12 +243,13 @@ def _script_findings(
                     "incompatible with the current game/SHVDN version."
                 ),
                 fix=(
-                    f"Uninstall or update the mod that ships {name}, or update "
+                    f"Disable or uninstall the mod that ships {name}, or update "
                     "ScriptHookVDotNet."
                 ),
                 evidence=_excerpt_for(text, name),
                 category="crash",
-                fix_targets=(name,) if owner is None else (name, owner.display_name),
+                fix_action=FIX_DISABLE_MODS if owner is not None else "",
+                fix_targets=(owner.mod_id,) if owner is not None else (),
             )
         )
 
@@ -267,10 +269,14 @@ def _script_findings(
                     "dependency (ScriptHookVDotNet version, NativeUI, ...) is "
                     "missing or too old."
                 ),
-                fix="Install/update the dependency named in the log excerpt.",
+                fix=(
+                    "Install/update the dependency named in the log excerpt, "
+                    "or disable the owning mod if it is broken."
+                ),
                 evidence=_excerpt_for(text, name),
                 category="crash",
-                fix_targets=(name,) if owner is None else (name, owner.display_name),
+                fix_action=FIX_DISABLE_MODS if owner is not None else "",
+                fix_targets=(owner.mod_id,) if owner is not None else (),
             )
         )
     return tuple(findings)
@@ -298,9 +304,10 @@ def _recent_install_findings(
                 "Recently installed mods are the prime suspects after a new "
                 "crash: " + ", ".join(names)
             ),
-            fix="If the crash started after one of these, uninstall it first.",
+            fix="If the crash started after one of these, disable it first.",
             category="crash",
-            fix_targets=names,
+            fix_action=FIX_DISABLE_MODS,
+            fix_targets=tuple(mod.mod_id for mod in recent[:8]),
         ),
     )
 

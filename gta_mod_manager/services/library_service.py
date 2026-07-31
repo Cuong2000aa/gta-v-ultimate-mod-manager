@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import shutil
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from gta_mod_manager.core.app_paths import AppPaths
 from gta_mod_manager.core.events import (
     EventBus,
     ModLibraryChangedEvent,
@@ -37,6 +39,7 @@ from gta_mod_manager.services.backup_service import BackupService
 from gta_mod_manager.utils import fs
 
 _LOGGER = get_logger("services.library")
+_DISABLED_QUARANTINE = "disabled-mods"
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,12 +71,14 @@ class LibraryService:
         backups: BackupService,
         backup_repository: JsonBackupRepository,
         bus: EventBus,
+        paths: AppPaths,
     ) -> None:
         self._mods = mods
         self._uninstaller = uninstaller
         self._backups = backups
         self._backup_repository = backup_repository
         self._bus = bus
+        self._paths = paths
 
     def list_installed(self, install: GameInstall | None = None) -> tuple[ModSummary, ...]:
         """Return the installed mods, optionally filtered by installation."""
@@ -192,6 +197,7 @@ class LibraryService:
             return Result.fail(str(error), code="library.uninstall_failed")
 
         reporter.finish(operation_id, f"Removed {mod.display_name}")
+        self._clear_quarantine(mod_id)
         self._mods.remove(mod_id)
         self._backup_repository.add_operation(record.completed(OperationStatus.SUCCEEDED))
         self._bus.publish(ModLibraryChangedEvent(reason="uninstalled"))
@@ -378,6 +384,24 @@ class LibraryService:
             return Result.fail("This mod is not tracked by the library", code="library.unknown")
 
         problems: list[str] = []
+        if mod.status is ModStatus.DISABLED:
+            for record in mod.installed_files:
+                if record.shared_archive:
+                    continue
+                if not self._is_under_game(mod.game_root, record.target_path):
+                    # OpenIV staging / external payloads are not loadable in-game.
+                    continue
+                quarantined = self._quarantine_file_path(mod, record.target_path)
+                if quarantined.is_file():
+                    if record.sha256 and not self._matches(quarantined, record.sha256):
+                        problems.append(f"changed in quarantine: {record.target_path}")
+                elif record.target_path.exists():
+                    if record.sha256 and not self._matches(record.target_path, record.sha256):
+                        problems.append(f"changed: {record.target_path}")
+                else:
+                    problems.append(f"missing from quarantine: {record.target_path}")
+            return Result.ok(tuple(problems))
+
         for record in mod.installed_files:
             if not record.target_path.exists():
                 problems.append(f"missing: {record.target_path}")
@@ -390,28 +414,253 @@ class LibraryService:
             self._bus.publish(ModLibraryChangedEvent(reason="verified"))
         return Result.ok(tuple(problems))
 
-    def set_enabled(self, mod_id: str, enabled: bool) -> Result[InstalledMod]:
-        """Flag a mod as enabled or disabled in the library.
+    def set_enabled(
+        self,
+        mod_id: str,
+        enabled: bool,
+        *,
+        reporter: ProgressReporter | None = None,
+    ) -> Result[InstalledMod]:
+        """Physically enable or disable a mod by quarantining its loose files.
 
-        Only the record changes; files are not moved. Physically disabling a
-        mod is a separate operation offered through uninstall plus reinstall,
-        which keeps the file bookkeeping honest.
+        Disable moves non-shared files under the app backup folder and reverts
+        shared ``.rpf`` members. Enable restores quarantined files. Shared
+        archive content is not re-applied on enable — reinstall the mod to
+        put add-on / replace models back.
         """
-        updated = self._mods.update_status(
-            mod_id, ModStatus.INSTALLED if enabled else ModStatus.DISABLED
-        )
-        if updated is None:
+        mod = self._mods.get(mod_id)
+        if mod is None:
             return Result.fail("This mod is not tracked by the library", code="library.unknown")
+
+        reporter = reporter or NullProgressReporter()
+        operation_id = new_operation_id()
+        if enabled:
+            if mod.status is ModStatus.INSTALLED:
+                return Result.ok(mod)
+            return self._physically_enable(mod, operation_id, reporter)
+        if mod.status is ModStatus.DISABLED:
+            return Result.ok(mod)
+        return self._physically_disable(mod, operation_id, reporter)
+
+    def _physically_disable(
+        self,
+        mod: InstalledMod,
+        operation_id: str,
+        reporter: ProgressReporter,
+    ) -> Result[InstalledMod]:
+        plain = [item for item in mod.installed_files if not item.shared_archive]
+        shared = [item for item in mod.installed_files if item.shared_archive]
+        total = 1 + int(bool(plain)) + int(bool(shared))
+        reporter.start(operation_id, f"Disabling {mod.display_name}", total=total)
+        step = 0
+        warnings: list[str] = []
+
+        try:
+            if plain:
+                reporter.advance(operation_id, step, "Moving loose files out of the game folder")
+                moved = self._quarantine_plain_files(mod, plain)
+                step += 1
+                _LOGGER.info("Quarantined %d file(s) for %s", moved, mod.display_name)
+            if shared:
+                reporter.advance(
+                    operation_id, step, "Restoring stock models in shared archives"
+                )
+                shared_warnings, _members, _archives = self._restore_shared_archives(
+                    mod, reporter
+                )
+                warnings.extend(shared_warnings)
+                warnings.append(
+                    "Shared archive models were restored to stock. "
+                    "Reinstall this mod after enabling to put them back."
+                )
+                step += 1
+            reporter.advance(operation_id, step, "Updating library status")
+            updated = self._mods.update_status(mod.mod_id, ModStatus.DISABLED)
+            if updated is None:
+                raise InstallError("Could not update mod status")
+        except (OSError, InstallError, ValueError) as error:
+            reporter.finish(operation_id, f"Could not disable {mod.display_name}")
+            return Result.fail(str(error), code="library.disable_failed")
+
+        reporter.finish(operation_id, f"Disabled {mod.display_name}")
         self._bus.publish(ModLibraryChangedEvent(reason="status"))
-        return Result.ok(updated)
+        unique_warnings = tuple(dict.fromkeys(warnings))
+        self._bus.publish(
+            NotificationEvent(
+                title=f"{mod.display_name} disabled",
+                message="Loose files were moved out of the game folder.",
+                level=NotificationLevel.SUCCESS,
+            )
+        )
+        return Result(value=updated, warnings=unique_warnings)
+
+    def _physically_enable(
+        self,
+        mod: InstalledMod,
+        operation_id: str,
+        reporter: ProgressReporter,
+    ) -> Result[InstalledMod]:
+        plain = [item for item in mod.installed_files if not item.shared_archive]
+        has_shared = any(item.shared_archive for item in mod.installed_files)
+        reporter.start(operation_id, f"Enabling {mod.display_name}", total=2)
+        warnings: list[str] = []
+        try:
+            reporter.advance(operation_id, 0, "Restoring loose files into the game folder")
+            restored = self._restore_plain_files(mod, plain)
+            reporter.advance(operation_id, 1, "Updating library status")
+            updated = self._mods.update_status(mod.mod_id, ModStatus.INSTALLED)
+            if updated is None:
+                raise InstallError("Could not update mod status")
+        except (OSError, InstallError, ValueError) as error:
+            reporter.finish(operation_id, f"Could not enable {mod.display_name}")
+            return Result.fail(str(error), code="library.enable_failed")
+
+        if has_shared:
+            warnings.append(
+                "Shared archive content was not re-applied. Reinstall the mod "
+                "to restore add-on / replace models inside mods/*.rpf."
+            )
+        reporter.finish(
+            operation_id,
+            f"Enabled {mod.display_name} ({restored} file(s) restored)",
+        )
+        self._bus.publish(ModLibraryChangedEvent(reason="status"))
+        self._bus.publish(
+            NotificationEvent(
+                title=f"{mod.display_name} enabled",
+                message=f"Restored {restored} file(s) into the game folder.",
+                level=NotificationLevel.SUCCESS,
+            )
+        )
+        return Result(value=updated, warnings=tuple(warnings))
+
+    def _quarantine_plain_files(
+        self, mod: InstalledMod, records: list[InstalledFileRecord]
+    ) -> int:
+        moved = 0
+        for record in records:
+            source = fs.normalise(record.target_path)
+            if not self._is_under_game(mod.game_root, source):
+                # Staging / OpenIV payloads live under the app library, not the
+                # game folder — leaving them alone is enough for a soft disable.
+                continue
+            if not source.exists():
+                continue
+            destination = self._quarantine_file_path(mod, source)
+            if destination.exists():
+                fs.delete_file(destination) if destination.is_file() else shutil.rmtree(
+                    destination
+                )
+            if source.is_dir():
+                fs.ensure_directory(destination.parent)
+                shutil.move(str(source), str(destination))
+            else:
+                fs.move_file(source, destination)
+            moved += 1
+        return moved
+
+    def _restore_plain_files(
+        self, mod: InstalledMod, records: list[InstalledFileRecord]
+    ) -> int:
+        restored = 0
+        for record in records:
+            destination = fs.normalise(record.target_path)
+            if not self._is_under_game(mod.game_root, destination):
+                continue
+            source = self._quarantine_file_path(mod, destination)
+            if not source.exists():
+                if destination.exists():
+                    continue
+                raise InstallError(
+                    f"Quarantined file missing for {destination.name}; "
+                    "reinstall the mod to restore it."
+                )
+            if destination.exists():
+                if destination.is_dir():
+                    shutil.rmtree(destination)
+                else:
+                    fs.delete_file(destination)
+            if source.is_dir():
+                fs.ensure_directory(destination.parent)
+                shutil.move(str(source), str(destination))
+            else:
+                fs.move_file(source, destination)
+            restored += 1
+        quarantine = self._quarantine_root(mod.mod_id)
+        if quarantine.is_dir() and not any(quarantine.rglob("*")):
+            shutil.rmtree(quarantine, ignore_errors=True)
+        elif quarantine.is_dir():
+            # Remove empty parents left after restores.
+            for path in sorted(quarantine.rglob("*"), reverse=True):
+                if path.is_dir():
+                    try:
+                        path.rmdir()
+                    except OSError:
+                        pass
+            try:
+                quarantine.rmdir()
+            except OSError:
+                pass
+        return restored
+
+    def _quarantine_root(self, mod_id: str) -> Path:
+        safe = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in mod_id)
+        return self._paths.backup / _DISABLED_QUARANTINE / (safe or "mod")
+
+    def _quarantine_file_path(self, mod: InstalledMod, target: Path) -> Path:
+        relative = self._relative_to_game(mod.game_root, target)
+        return self._quarantine_root(mod.mod_id) / relative
+
+    def _clear_quarantine(self, mod_id: str) -> None:
+        quarantine = self._quarantine_root(mod_id)
+        if quarantine.exists():
+            shutil.rmtree(quarantine, ignore_errors=True)
+
+    @staticmethod
+    def _is_under_game(game_root: Path, target: Path) -> bool:
+        root = fs.normalise(game_root)
+        absolute = fs.normalise(target)
+        try:
+            relative = absolute.relative_to(root)
+        except ValueError:
+            return False
+        return not relative.is_absolute() and ".." not in relative.parts
+
+    @staticmethod
+    def _relative_to_game(game_root: Path, target: Path) -> Path:
+        root = fs.normalise(game_root)
+        absolute = fs.normalise(target)
+        try:
+            relative = absolute.relative_to(root)
+        except ValueError as error:
+            raise ValueError(f"Refusing path outside game root: {target}") from error
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError(f"Refusing unsafe relative path: {relative}")
+        return relative
 
     def _summarise(self, mod: InstalledMod) -> ModSummary:
         """Build the list-view summary of ``mod``."""
         total = 0
         intact = True
         for record in mod.installed_files:
-            if record.target_path.is_file():
-                total += record.target_path.stat().st_size
+            if record.shared_archive:
+                if record.target_path.is_file():
+                    continue
+                intact = False
+                continue
+            live = record.target_path
+            candidate = live
+            if (
+                mod.status is ModStatus.DISABLED
+                and self._is_under_game(mod.game_root, live)
+            ):
+                quarantined = self._quarantine_file_path(mod, live)
+                if quarantined.exists():
+                    candidate = quarantined
+            if candidate.is_file():
+                total += candidate.stat().st_size
+            elif candidate.is_dir():
+                continue
             else:
                 intact = False
         return ModSummary(mod=mod, size_label=fs.human_size(total), is_intact=intact)

@@ -52,6 +52,36 @@ def test_addon_vehicle_installs_into_dlcpacks(
     assert "dlcpacks:/adder2/" in text
 
 
+def test_addon_weapon_installs_into_dlcpacks(
+    application: Application, addon_weapon_zip: Path, game_root: Path
+) -> None:
+    report, preview = _install(application, addon_weapon_zip, game_root)
+
+    assert preview.package.classification.primary is ModKind.WEAPON
+    pack_root = game_root / "mods" / "update" / "x64" / "dlcpacks" / "demogun"
+    assert (pack_root / "dlc.rpf").is_file()
+    assert (pack_root / "data" / "weapons.meta").is_file()
+    assert report.file_count >= 3
+    assert any(op.action.value == "rpf_dlc_register" for op in preview.plan.operations)
+    assert not any("dlclist" in step.title.lower() for step in preview.plan.manual_steps)
+
+
+def test_addon_map_installs_into_dlcpacks(
+    application: Application, addon_map_zip: Path, game_root: Path
+) -> None:
+    report, preview = _install(application, addon_map_zip, game_root)
+
+    assert preview.package.classification.primary is ModKind.MAP
+    pack_root = game_root / "mods" / "update" / "x64" / "dlcpacks" / "demomap"
+    assert (pack_root / "dlc.rpf").is_file()
+    assert (
+        pack_root / "x64" / "levels" / "gta5" / "custom_maps" / "demo.ymap"
+    ).is_file()
+    assert report.file_count >= 3
+    assert any(op.action.value == "rpf_dlc_register" for op in preview.plan.operations)
+    assert not any("dlclist" in step.title.lower() for step in preview.plan.manual_steps)
+
+
 def test_addon_vehicle_never_touches_the_game_root(
     application: Application, addon_vehicle_zip: Path, game_root: Path
 ) -> None:

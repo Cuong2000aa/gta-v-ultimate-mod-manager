@@ -76,17 +76,23 @@ class VehicleAssetRule(AnalyzerRule):
 
 
 class AddonVehicleRule(AnalyzerRule):
-    """Distinguishes an add-on DLC pack from a plain replacement.
+    """Recognises an add-on DLC pack (vehicle, weapon, or map).
 
     An add-on ships its own ``dlc.rpf`` layout: ``content.xml`` plus
-    ``setup2.xml``. Those two files are the definitive signal, so this rule
-    votes strongly for :attr:`ModKind.VEHICLE_ADDON` and vetoes
-    :attr:`ModKind.VEHICLE_REPLACE` — unless the archive also ships a
-    ``Replace`` folder, in which case Replace wins.
+    ``setup2.xml``. Those two files are the definitive signal. The primary
+    kind follows the pack's content (weapon metas / map placements / else
+    vehicle add-on). A ``Replace`` folder still prefers replacement installs.
     """
 
     rule_id = "vehicle.addon"
     display_name = "Add-on DLC pack"
+
+    _WEAPON_META = (
+        "weapons.meta",
+        "weaponcomponents.meta",
+        "weaponarchetypes.meta",
+        "weaponanimations.meta",
+    )
 
     def evaluate(self, context: AnalysisContext) -> Iterable[RuleHit]:
         """Return add-on votes when DLC pack descriptors are present."""
@@ -111,12 +117,18 @@ class AddonVehicleRule(AnalyzerRule):
             if present
         ]
         weight = {1: 0.35, 2: 0.7, 3: 0.9}[len(signals)]
+        kind = self._addon_kind(context)
+        label = {
+            ModKind.WEAPON: "Weapon add-on DLC pack",
+            ModKind.MAP: "Map add-on DLC pack",
+            ModKind.VEHICLE_ADDON: "Vehicle add-on DLC pack",
+        }[kind]
 
         hits = [
             RuleHit(
-                kind=ModKind.VEHICLE_ADDON,
+                kind=kind,
                 weight=weight,
-                reason="Add-on DLC pack detected: " + ", ".join(signals),
+                reason=f"{label} detected: " + ", ".join(signals),
                 tags=frozenset({"addon", "requires_dlclist"}),
             )
         ]
@@ -131,7 +143,7 @@ class AddonVehicleRule(AnalyzerRule):
             )
             hits.append(
                 RuleHit(
-                    kind=ModKind.VEHICLE_ADDON,
+                    kind=kind,
                     weight=-0.45,
                     reason="Replace folder present; Add-On half is secondary",
                 )
@@ -145,6 +157,23 @@ class AddonVehicleRule(AnalyzerRule):
                 )
             )
         return tuple(hits)
+
+    def _addon_kind(self, context: AnalysisContext) -> ModKind:
+        """Pick weapon / map / vehicle for a sealed add-on pack."""
+        if context.has_file(*constants.VEHICLE_META_FILES):
+            return ModKind.VEHICLE_ADDON
+        if context.has_file(*self._WEAPON_META) or any(
+            item.lower_name.startswith("w_")
+            for item in context.files_with_suffix(".ydr", ".ytd")
+        ):
+            return ModKind.WEAPON
+        if (
+            context.count_suffix(".ymap")
+            or context.count_suffix(".ytyp")
+            or context.has_directory("dlc_mpmap", "custom_maps", "mapfiles")
+        ):
+            return ModKind.MAP
+        return ModKind.VEHICLE_ADDON
 
 
 class ReplaceLayoutRule(AnalyzerRule):

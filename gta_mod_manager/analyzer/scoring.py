@@ -31,6 +31,8 @@ _TIE_BREAK_ORDER: tuple[ModKind, ...] = (
     ModKind.LML,
     ModKind.VEHICLE_REPLACE,
     ModKind.VEHICLE_ADDON,
+    ModKind.WEAPON,
+    ModKind.MAP,
 )
 
 

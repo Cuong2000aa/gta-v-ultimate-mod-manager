@@ -153,7 +153,7 @@ class DiagnosticsView(QWidget):
                 child = QTreeWidgetItem(
                     [
                         title,
-                        t(_SEVERITY_KEYS[finding.severity]),
+                        f"[{t(_SEVERITY_KEYS[finding.severity])}]",
                         fix or "—",
                     ]
                 )

@@ -35,6 +35,7 @@ from gta_mod_manager.gui.widgets.cards import (
 )
 from gta_mod_manager.models.component import DetectedComponent
 from gta_mod_manager.models.enums import ComponentStatus
+from gta_mod_manager.models.essentials import EssentialAction, EssentialsStatus
 from gta_mod_manager.models.launch import LaunchIssueSeverity, LaunchOutcome, LaunchPreflightReport
 
 _COMPONENT_BADGES: dict[ComponentStatus, tuple[str, str]] = {
@@ -82,6 +83,7 @@ class DashboardView(QWidget):
         layout.addWidget(page_header(t("dashboard.title"), t("dashboard.subtitle")))
         layout.addWidget(self._build_install_card())
         layout.addLayout(self._build_stats())
+        layout.addWidget(self._build_essentials_card())
         layout.addWidget(self._build_components_card())
         layout.addWidget(self._build_issues_card())
         layout.addStretch(1)
@@ -150,6 +152,32 @@ class DashboardView(QWidget):
             grid.addWidget(card, 0, column)
         return grid
 
+    def _build_essentials_card(self) -> Card:
+        """Build the Story Mode essentials kit card."""
+        card = Card(t("dashboard.essentials_card"))
+        self._essentials_status = QLabel(t("dashboard.essentials_waiting"))
+        self._essentials_status.setObjectName("Hint")
+        self._essentials_status.setWordWrap(True)
+        card.body.addWidget(self._essentials_status)
+
+        self._essentials_list = QListWidget()
+        self._essentials_list.setMinimumHeight(120)
+        card.body.addWidget(self._essentials_list)
+
+        actions = QHBoxLayout()
+        actions.setSpacing(8)
+        self._essentials_install = QPushButton(t("dashboard.essentials_install"))
+        self._essentials_install.setObjectName("PrimaryButton")
+        self._essentials_install.clicked.connect(self._vm.install_essentials)
+        actions.addWidget(self._essentials_install)
+
+        self._essentials_manual = QPushButton(t("dashboard.essentials_manual"))
+        self._essentials_manual.clicked.connect(self._vm.open_essentials_pages)
+        actions.addWidget(self._essentials_manual)
+        actions.addStretch(1)
+        card.body.addLayout(actions)
+        return card
+
     def _build_components_card(self) -> Card:
         """Build the component table."""
         card = Card(t("dashboard.card_components"))
@@ -217,6 +245,7 @@ class DashboardView(QWidget):
         self._backup_card.set_value(str(state.snapshot_count))
 
         self._fill_components(state.components)
+        self._fill_essentials(state.essentials)
         self._fill_issues(state)
 
     def _render_missing(self, message: str) -> None:
@@ -229,8 +258,41 @@ class DashboardView(QWidget):
         self._components.clear()
         self._issues.clear()
         self._issues.addItem(t("dashboard.pick_folder"))
+        self._essentials_list.clear()
+        self._essentials_status.setText(t("dashboard.essentials_waiting"))
+        self._essentials_install.setEnabled(False)
+        self._essentials_manual.setEnabled(False)
         for card in (self._mods_card, self._components_card, self._backup_card):
             card.set_value("-")
+
+    def _fill_essentials(self, status: EssentialsStatus | None) -> None:
+        """Render the essentials kit checklist."""
+        self._essentials_list.clear()
+        if status is None:
+            self._essentials_status.setText(t("dashboard.essentials_waiting"))
+            self._essentials_install.setEnabled(False)
+            self._essentials_manual.setEnabled(False)
+            return
+        self._essentials_status.setText(status.message)
+        for item in status.items:
+            mark = (
+                t("dashboard.essentials_mark_ok")
+                if item.installed
+                else t("dashboard.essentials_mark_missing")
+            )
+            self._essentials_list.addItem(f"[{mark}] {item.display_name} — {item.detail}")
+        can_auto = any(
+            not item.installed
+            and item.action
+            in (EssentialAction.AUTO_INSTALL, EssentialAction.CREATE_FOLDER)
+            for item in status.items
+        )
+        can_manual = any(
+            not item.installed and item.action is EssentialAction.OPEN_BROWSER
+            for item in status.items
+        )
+        self._essentials_install.setEnabled(can_auto)
+        self._essentials_manual.setEnabled(can_manual)
 
     def _fill_components(self, components: tuple[DetectedComponent, ...]) -> None:
         """Rebuild the component table."""
@@ -321,8 +383,10 @@ class DashboardView(QWidget):
             )
 
     def _on_busy(self, busy: bool) -> None:
-        """Disable launch while a background task runs."""
+        """Disable launch / essentials while a background task runs."""
         if busy:
             self._launch_button.setEnabled(False)
+            self._essentials_install.setEnabled(False)
+            self._essentials_manual.setEnabled(False)
         elif self._path_label.text() and self._path_label.text() != t("dashboard.no_install"):
             self._launch_button.setEnabled(True)

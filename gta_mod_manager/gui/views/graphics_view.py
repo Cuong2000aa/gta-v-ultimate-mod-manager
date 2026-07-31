@@ -12,7 +12,15 @@ from PySide6.QtWidgets import (
 
 from gta_mod_manager.gui.i18n import t
 from gta_mod_manager.gui.viewmodels.graphics_vm import GraphicsViewModel
-from gta_mod_manager.gui.widgets.cards import Card, page_header
+from gta_mod_manager.gui.widgets.cards import (
+    BADGE_ERROR,
+    BADGE_NEUTRAL,
+    BADGE_OK,
+    BADGE_WARNING,
+    Badge,
+    Card,
+    page_header,
+)
 from gta_mod_manager.models.graphics import GraphicsStatus
 
 
@@ -38,10 +46,16 @@ class GraphicsView(QWidget):
         layout.setSpacing(16)
         layout.addWidget(page_header(t("graphics.title"), t("graphics.subtitle")))
 
-        self._badge = QLabel(t("graphics.status_unknown"))
-        self._badge.setObjectName("Hint")
-        self._badge.setWordWrap(True)
-        layout.addWidget(self._badge)
+        status_row = QHBoxLayout()
+        self._badge = Badge(t("graphics.badge_short_missing"), BADGE_NEUTRAL)
+        status_row.addWidget(self._badge)
+        status_row.addStretch(1)
+        layout.addLayout(status_row)
+
+        self._badge_detail = QLabel(t("graphics.status_unknown"))
+        self._badge_detail.setObjectName("Hint")
+        self._badge_detail.setWordWrap(True)
+        layout.addWidget(self._badge_detail)
 
         pack = Card(t("graphics.card_pack"))
         pack_body = QLabel(t("graphics.pack.cuongvision.desc"))
@@ -95,11 +109,14 @@ class GraphicsView(QWidget):
         if not isinstance(status, GraphicsStatus):
             return
         if status.conflict_enb:
-            self._badge.setText(t("graphics.badge_conflict"))
+            self._badge.set_state(t("graphics.badge_short_conflict"), BADGE_ERROR)
+            self._badge_detail.setText(t("graphics.badge_conflict"))
         elif status.installed:
-            self._badge.setText(t("graphics.badge_installed"))
+            self._badge.set_state(t("graphics.badge_short_installed"), BADGE_OK)
+            self._badge_detail.setText(t("graphics.badge_installed"))
         else:
-            self._badge.setText(t("graphics.badge_not_installed"))
+            self._badge.set_state(t("graphics.badge_short_missing"), BADGE_NEUTRAL)
+            self._badge_detail.setText(t("graphics.badge_not_installed"))
         self._status.setText(status.message)
         self._install.setEnabled(not status.conflict_enb)
         self._uninstall.setEnabled(status.installed)
@@ -108,7 +125,8 @@ class GraphicsView(QWidget):
         self._status.setText(message)
 
     def _on_error(self, message: str) -> None:
-        self._badge.setText(t("graphics.badge_error"))
+        self._badge.set_state(t("graphics.badge_short_error"), BADGE_ERROR)
+        self._badge_detail.setText(t("graphics.badge_error"))
         self._status.setText(message)
 
     def _on_busy(self, busy: bool) -> None:

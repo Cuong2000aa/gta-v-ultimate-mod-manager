@@ -7,12 +7,14 @@ from pathlib import Path
 
 from gta_mod_manager.core.logging_setup import get_logger
 from gta_mod_manager.core.result import Result
+from gta_mod_manager.diagnostics.actions import FIX_DISABLE_MODS
 from gta_mod_manager.diagnostics.repairs import apply_diagnostic_fix
 from gta_mod_manager.diagnostics.scanner import DiagnosticsScanner
 from gta_mod_manager.models.diagnostic import DiagnosticFinding, DiagnosticReport
 from gta_mod_manager.models.game_install import GameInstall
 from gta_mod_manager.repository.mod_repository import JsonModRepository
 from gta_mod_manager.services.game_service import GameService
+from gta_mod_manager.services.library_service import LibraryService
 
 _LOGGER = get_logger("services.diagnostics")
 
@@ -29,11 +31,13 @@ class DiagnosticsService:
         scanner: DiagnosticsScanner | None = None,
         mods: JsonModRepository | None = None,
         session_findings: SessionFindingsProvider | None = None,
+        library: LibraryService | None = None,
     ) -> None:
         self._game = game
         self._scanner = scanner or DiagnosticsScanner()
         self._mods = mods
         self._session_findings = session_findings
+        self._library = library
 
     def run(self, install: GameInstall | None = None) -> DiagnosticReport | None:
         """Scan ``install`` (or the active one) and return the report."""
@@ -74,7 +78,37 @@ class DiagnosticsService:
                     code="diagnostics.need_game",
                 )
             target = resolved.unwrap()
+        if action == FIX_DISABLE_MODS:
+            return self._disable_mods(tuple(targets))
         return apply_diagnostic_fix(Path(target.root_path), action, targets)
+
+    def _disable_mods(self, mod_ids: tuple[str, ...]) -> Result[str]:
+        """Physically disable each listed library mod."""
+        if self._library is None:
+            return Result.fail(
+                "Library service is unavailable for disable repairs",
+                code="diagnostics.fix.unavailable",
+            )
+        unique = tuple(dict.fromkeys(item.strip() for item in mod_ids if item.strip()))
+        if not unique:
+            return Result.fail("Nothing selected to disable", code="diagnostics.fix.empty")
+
+        disabled: list[str] = []
+        warnings: list[str] = []
+        for mod_id in unique:
+            result = self._library.set_enabled(mod_id, False)
+            if result.is_error:
+                return Result.fail(
+                    result.error or f"Could not disable {mod_id}",
+                    code=result.code or "diagnostics.fix.disable_failed",
+                )
+            disabled.append(result.unwrap().display_name)
+            warnings.extend(result.warnings)
+
+        message = f"Disabled {len(disabled)} mod(s): {', '.join(disabled)}"
+        if warnings:
+            message = f"{message}. {' '.join(dict.fromkeys(warnings))}"
+        return Result.ok(message)
 
     def _with_session_findings(self, report: DiagnosticReport) -> DiagnosticReport:
         """Prepend the latest game-session findings to ``report``."""

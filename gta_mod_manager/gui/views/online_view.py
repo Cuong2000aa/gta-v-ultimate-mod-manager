@@ -20,8 +20,19 @@ from gta_mod_manager.gui.i18n import t
 from gta_mod_manager.gui.viewmodels.online_vm import OnlineViewModel
 from gta_mod_manager.gui.widgets.cards import Card, page_header
 from gta_mod_manager.models.online_mod import OnlineDownloadResult, OnlineModListing, OnlineSource
+from gta_mod_manager.services.gta5mods_client import Gta5ModsClient
 
 _LISTING_ROLE = Qt.ItemDataRole.UserRole
+
+_CATEGORY_LABELS: dict[str, str] = {
+    "vehicles": "online.category_vehicles",
+    "weapons": "online.category_weapons",
+    "maps": "online.category_maps",
+    "scripts": "online.category_scripts",
+    "player": "online.category_player",
+    "misc": "online.category_misc",
+    "tools": "online.category_tools",
+}
 
 
 class OnlineView(QWidget):
@@ -55,6 +66,15 @@ class OnlineView(QWidget):
         self._source.addItem(t("online.source_nexus"), OnlineSource.NEXUS)
         self._source.currentIndexChanged.connect(self._on_source_changed)
         toolbar.addWidget(self._source)
+
+        self._category = QComboBox()
+        for slug in Gta5ModsClient.BROWSE_CATEGORIES:
+            self._category.addItem(t(_CATEGORY_LABELS[slug]), slug)
+        self._category.setCurrentIndex(
+            Gta5ModsClient.BROWSE_CATEGORIES.index("vehicles")
+        )
+        self._category.currentIndexChanged.connect(self._on_category_changed)
+        toolbar.addWidget(self._category)
 
         self._search = QLineEdit()
         self._search.setPlaceholderText(t("online.search_ph"))
@@ -131,7 +151,13 @@ class OnlineView(QWidget):
     def _on_source_changed(self, _index: int) -> None:
         data = self._source.currentData()
         if isinstance(data, OnlineSource):
+            self._category.setEnabled(data is OnlineSource.GTA5_MODS)
             self._vm.set_source(data)
+
+    def _on_category_changed(self, _index: int) -> None:
+        slug = self._category.currentData()
+        if isinstance(slug, str):
+            self._vm.set_category(slug)
 
     def _render(self, listings: object) -> None:
         self._table.clear()

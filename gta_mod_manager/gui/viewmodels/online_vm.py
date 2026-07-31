@@ -14,6 +14,7 @@ from gta_mod_manager.models.online_mod import (
     OnlineSearchResult,
     OnlineSource,
 )
+from gta_mod_manager.services.gta5mods_client import Gta5ModsClient
 from gta_mod_manager.services.online_mod_service import OnlineModService
 
 
@@ -33,6 +34,7 @@ class OnlineViewModel(ViewModel):
         super().__init__(runner, parent)
         self._online = online
         self._source = OnlineSource.GTA5_MODS
+        self._category = "vehicles"
         self._listings: tuple[OnlineModListing, ...] = ()
         self._query = ""
 
@@ -40,6 +42,11 @@ class OnlineViewModel(ViewModel):
     def source(self) -> OnlineSource:
         """Return the active catalogue."""
         return self._source
+
+    @property
+    def category(self) -> str:
+        """Return the active GTA5-Mods browse category slug."""
+        return self._category
 
     @property
     def listings(self) -> tuple[OnlineModListing, ...]:
@@ -52,14 +59,28 @@ class OnlineViewModel(ViewModel):
         self.sourceChanged.emit(source)
         self.search(self._query)
 
+    def set_category(self, category: str) -> None:
+        """Switch GTA5-Mods category feed and refresh when the query is empty."""
+        cleaned = (category or "vehicles").strip().lower()
+        if cleaned not in Gta5ModsClient.BROWSE_CATEGORIES:
+            cleaned = "vehicles"
+        self._category = cleaned
+        if self._source is OnlineSource.GTA5_MODS:
+            self.search(self._query)
+
     def search(self, query: str) -> None:
-        """Search the active catalogue."""
+        """Search the active catalogue (or browse the category feed)."""
         self._query = query
         source = self._source
-        self.statusChanged.emit(f"Searching {source.display_name}...")
+        category = self._category if source is OnlineSource.GTA5_MODS else None
+        label = source.display_name
+        if source is OnlineSource.GTA5_MODS and not query.strip():
+            self.statusChanged.emit(f"Browsing {label} / {category}...")
+        else:
+            self.statusChanged.emit(f"Searching {label}...")
 
         def work() -> OnlineSearchResult:
-            result = self._online.search(source, query)
+            result = self._online.search(source, query, category=category)
             if result.is_error:
                 raise RuntimeError(result.error or "Search failed")
             return result.unwrap()

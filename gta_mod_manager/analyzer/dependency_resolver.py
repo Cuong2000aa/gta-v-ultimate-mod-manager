@@ -62,7 +62,8 @@ _KIND_DEPENDENCIES: dict[ModKind, tuple[str, ...]] = {
     ModKind.OPENIV_PACKAGE: ("requires_openiv_rules",),
     ModKind.VEHICLE_ADDON: ("requires_openiv_rules", "requires_dlclist"),
     ModKind.VEHICLE_REPLACE: ("requires_openiv_rules",),
-    ModKind.MAP: ("requires_openiv_rules",),
+    ModKind.MAP: ("requires_openiv_rules", "requires_dlclist"),
+    ModKind.WEAPON: ("requires_openiv_rules", "requires_dlclist"),
     ModKind.TRAINER: ("requires_asi_loader",),
 }
 

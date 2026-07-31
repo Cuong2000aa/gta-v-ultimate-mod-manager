@@ -52,6 +52,7 @@ from gta_mod_manager.services.install_service import InstallService
 from gta_mod_manager.services.launch_service import LaunchService
 from gta_mod_manager.services.library_service import LibraryService
 from gta_mod_manager.services.graphics_service import GraphicsService
+from gta_mod_manager.services.essentials_service import EssentialsService
 from gta_mod_manager.services.online_mod_service import OnlineModService
 from gta_mod_manager.services.spawn_catalog_service import SpawnCatalogService
 from gta_mod_manager.services.zombie_mode_service import ZombieModeService
@@ -134,6 +135,11 @@ class Application:
     def zombie(self) -> ZombieModeService:
         """Return the managed zombie game-mode service."""
         return self.container.resolve(ZombieModeService)
+
+    @property
+    def essentials(self) -> EssentialsService:
+        """Return the Story Mode essentials kit service."""
+        return self.container.resolve(EssentialsService)
 
     @property
     def plugins(self) -> PluginRegistry:
@@ -293,6 +299,7 @@ def _register_domain_services(container: Container, paths: AppPaths, bus: EventB
             backups=c.resolve(BackupService),
             backup_repository=c.resolve(JsonBackupRepository),
             bus=bus,
+            paths=paths,
         ),
     )
     container.register_factory(
@@ -314,6 +321,7 @@ def _register_domain_services(container: Container, paths: AppPaths, bus: EventB
             scanner=DiagnosticsScanner(),
             mods=c.resolve(SqliteModRepository),
             session_findings=_session_findings_provider(c),
+            library=c.resolve(LibraryService),
         ),
     )
     container.register_factory(
@@ -344,6 +352,14 @@ def _register_domain_services(container: Container, paths: AppPaths, bus: EventB
     container.register_factory(
         ZombieModeService,
         lambda c: ZombieModeService(game=c.resolve(GameService), paths=paths),
+    )
+    container.register_factory(
+        EssentialsService,
+        lambda c: EssentialsService(
+            game=c.resolve(GameService),
+            components=c.resolve(ComponentDetector),
+            paths=paths,
+        ),
     )
 
 

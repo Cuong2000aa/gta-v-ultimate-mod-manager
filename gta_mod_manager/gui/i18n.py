@@ -136,20 +136,38 @@ _EN: dict[str, str] = {
     "dashboard.subtitle": "Installation health, library size and recent activity.",
     # Install
     "install.title": "Install a Mod",
-    "install.subtitle": "Drop an archive, preview every write, then confirm.",
+    "install.subtitle": (
+        "Drop an archive, preview every write, then confirm. "
+        "Vehicles, weapons, maps (add-on DLC), peds, and scripts install automatically."
+    ),
     # Library
     "library.title": "Installed mods",
     "library.subtitle": (
         "Every file listed here was written by this manager and can be removed exactly."
     ),
     "library.search_ph": "Search by name, category or spawn code",
-    "library.card": "Library",
+    "library.card": "Your mods",
     "library.details": "Details",
     "library.verify": "Verify files",
     "library.disable": "Disable",
     "library.enable": "Enable",
     "library.uninstall": "Uninstall",
     "library.select_mod": "Select a mod",
+    "library.status_installed": "Installed",
+    "library.status_disabled": "Disabled",
+    "library.status_broken": "Incomplete files",
+    "library.status_available": "Available",
+    "library.status_files_missing": "Files missing",
+    "library.files_header": "Installed content",
+    "library.files_state": "State",
+    "library.working": "Working...",
+    "library.spawn_tip": (
+        "Type this in a trainer (Menyoo / Simple Trainer) to spawn the vehicle:\n{codes}"
+    ),
+    "library.disable_hint": (
+        "Disable moves loose files out of the game folder so they cannot load. "
+        "Shared archive models are restored to stock until you reinstall."
+    ),
     "library.uninstall_title": "Uninstall mod",
     "library.uninstall_complete": "Uninstall complete",
     "library.uninstall_complete_body": (
@@ -298,8 +316,7 @@ _EN: dict[str, str] = {
         "game/SHVDN version."
     ),
     "diagnostics.finding.crash.script_error.fix": (
-        "Uninstall or update the mod that ships this script, or update "
-        "ScriptHookVDotNet."
+        "Use Repair to disable the owning mod, or uninstall/update it / SHVDN."
     ),
     "diagnostics.finding.crash.script_load.title": "Script failed to load: {names}",
     "diagnostics.finding.crash.script_load.detail": (
@@ -307,7 +324,7 @@ _EN: dict[str, str] = {
         "(ScriptHookVDotNet version, NativeUI, ...) is missing or too old."
     ),
     "diagnostics.finding.crash.script_load.fix": (
-        "Install/update the dependency named in the log excerpt."
+        "Install the missing dependency from Essentials Kit, or disable the mod."
     ),
     "diagnostics.finding.crash.recent_mods.title": "Recently installed mods: {names}",
     "diagnostics.finding.crash.recent_mods.detail": (
@@ -315,7 +332,7 @@ _EN: dict[str, str] = {
         "new crash."
     ),
     "diagnostics.finding.crash.recent_mods.fix": (
-        "If the crash started after one of these, uninstall it first."
+        "Use Repair to physically disable the recent mods and relaunch."
     ),
     "diagnostics.finding.crash.no_evidence.title": (
         "The game crashed but no script left evidence"
@@ -336,9 +353,30 @@ _EN: dict[str, str] = {
     # Install view
     "install.card_plan": "Planned operations",
     "install.col_action": "Action",
-    "install.col_zone": "Zone",
-    "install.col_target": "Target",
+    "install.col_zone": "Where it writes",
+    "install.col_target": "Target path",
     "install.col_detail": "Detail",
+    "install.col_vehicle_source": "Source",
+    "install.col_vehicle_handling": "Handling",
+    "install.col_vehicle_make": "Manufacturer",
+    "install.kind_confidence": "Detected as {kind} ({confidence} confidence)",
+    "install.kind_vehicle_addon": "Vehicle add-on",
+    "install.kind_vehicle_replace": "Vehicle replace",
+    "install.kind_ped": "Character / ped",
+    "install.kind_weapon": "Weapon",
+    "install.kind_map": "Map",
+    "install.kind_script": "Script",
+    "install.kind_asi": "ASI plugin",
+    "install.kind_script_hook_dotnet": "ScriptHookVDotNet script",
+    "install.kind_graphics": "Graphics",
+    "install.kind_lml": "LML package",
+    "install.kind_openiv_package": "OpenIV package",
+    "install.kind_menyoo": "Menyoo",
+    "install.kind_trainer": "Trainer",
+    "install.kind_zombie": "Zombie",
+    "install.kind_sound": "Audio",
+    "install.kind_texture": "Texture pack",
+    "install.kind_unknown": "Unknown type",
     "install.card_package": "Package",
     "install.tab_vehicles": "Vehicles",
     "install.tab_vehicles_n": "Vehicles ({count})",
@@ -363,11 +401,11 @@ _EN: dict[str, str] = {
     "install.variant_replace": "Replace (overwrite stock car)",
     "install.variant_required": "Tick Add-On, Replace, or both before installing.",
     "install.zone_mods": "mods folder (safe)",
-    "install.zone_dlc": "mods/dlcpacks (safe)",
-    "install.zone_scripts": "scripts (allowed)",
-    "install.zone_lml": "LML (allowed)",
-    "install.zone_root": "game root (whitelisted)",
-    "install.zone_external": "staged outside the game",
+    "install.zone_dlc": "DLC packs under mods (safe)",
+    "install.zone_scripts": "scripts folder",
+    "install.zone_lml": "LML folder",
+    "install.zone_root": "Game folder (allowed files only)",
+    "install.zone_external": "Staged for OpenIV (outside game)",
     "install.zone_outside_tip": (
         "Written outside the mods folder because the safety policy allows it"
     ),
@@ -387,7 +425,16 @@ _EN: dict[str, str] = {
     # Dashboard
     "dashboard.card_active": "Active installation",
     "dashboard.detecting": "Detecting...",
-    "dashboard.badge_checking": "Checking",
+    "dashboard.badge_checking": "Checking…",
+    "dashboard.badge_not_ready": "Fix issues first",
+    "dashboard.badge_ready_warn": "Ready — warnings",
+    "dashboard.badge_ready": "Ready to launch",
+    "dashboard.badge_not_detected": "Pick game folder",
+    "dashboard.card_validation": "Issues & blockers",
+    "dashboard.essentials_install": "Install missing essentials",
+    "dashboard.essentials_manual": "Open ScriptHookV / OpenIV pages",
+    "dashboard.essentials_mark_ok": "OK",
+    "dashboard.essentials_mark_missing": "Missing",
     "dashboard.change_folder": "Change folder...",
     "dashboard.redetect": "Re-detect",
     "dashboard.create_mods": "Create mods folder",
@@ -398,6 +445,8 @@ _EN: dict[str, str] = {
     "dashboard.launch_issues_more": "...and {count} more.",
     "dashboard.launch_anyway_hint": "Launch anyway?",
     "dashboard.launch_started": "Started {exe}. Have fun.",
+    "dashboard.essentials_card": "Essentials Kit",
+    "dashboard.essentials_waiting": "Select a GTA V folder to check Story Mode essentials.",
     "dashboard.stat_mods": "Installed mods",
     "dashboard.stat_mods_cap": "tracked by the library",
     "dashboard.stat_components": "Components",
@@ -409,12 +458,7 @@ _EN: dict[str, str] = {
     "dashboard.col_status": "Status",
     "dashboard.col_version": "Version",
     "dashboard.col_location": "Location",
-    "dashboard.card_validation": "Validation",
     "dashboard.meta": "{platform} - version {version} - detected by {source}",
-    "dashboard.badge_not_ready": "Not ready",
-    "dashboard.badge_ready_warn": "Ready with warnings",
-    "dashboard.badge_ready": "Ready",
-    "dashboard.badge_not_detected": "Not detected",
     "dashboard.components_all": "all essential components present",
     "dashboard.components_missing": "{count} essential component(s) missing",
     "dashboard.no_install": "No GTA V installation selected",
@@ -426,6 +470,8 @@ _EN: dict[str, str] = {
     "dashboard.select_game_folder": "Select the GTA V folder",
     "dashboard.comp_installed": "Installed",
     "dashboard.comp_outdated": "Outdated",
+    "dashboard.comp_missing": "Missing",
+    "dashboard.comp_unknown": "Unknown",
     "dashboard.comp_missing": "Missing",
     "dashboard.comp_unknown": "Unknown",
     # Backup view
@@ -501,9 +547,13 @@ _EN: dict[str, str] = {
     "graphics.apply_level": "Apply level",
     "graphics.uninstall": "Uninstall",
     "graphics.status_unknown": "Checking graphics status...",
-    "graphics.badge_installed": "CuongVision Ultimate installed successfully",
+    "graphics.badge_short_installed": "Installed",
+    "graphics.badge_short_missing": "Not installed",
+    "graphics.badge_short_conflict": "Blocked by ENB",
+    "graphics.badge_short_error": "Error",
+    "graphics.badge_installed": "CuongVision Ultimate is active",
     "graphics.badge_installed_unknown_level": "Installed successfully",
-    "graphics.badge_not_installed": "Not installed yet — choose a level and press Install",
+    "graphics.badge_not_installed": "Not installed — press Install to add CuongVision Ultimate",
     "graphics.badge_conflict": "Blocked — ENB detected. Remove ENB before installing CuongVision",
     "graphics.badge_error": "Something went wrong — see details below",
     "graphics.card_textures": "Optional selective 2K textures",
@@ -524,7 +574,11 @@ _EN: dict[str, str] = {
     # Zombie game mode
     "zombie.title": "Zombie Mode",
     "zombie.subtitle": "A separate Left 4 Dead-style survival mode for GTA V Story Mode.",
-    "zombie.checking": "Checking Simple Zombies Reborn...",
+    "zombie.checking": "Checking…",
+    "zombie.badge_ready": "Ready",
+    "zombie.badge_missing": "Needs essentials",
+    "zombie.badge_not_installed": "Not installed",
+    "zombie.badge_error": "Error",
     "zombie.card_mode": "Simple Zombies Reborn 1.0.5f",
     "zombie.description": (
         "Verified May 2026 rebuild: dense sound-driven hordes, fast and special infected, "
@@ -553,9 +607,16 @@ _EN: dict[str, str] = {
     # Online mods
     "online.title": "Online Mods",
     "online.subtitle": "Search GTA5-Mods and Nexus Mods, then install with the same safe pipeline.",
-    "online.search_ph": "Search vehicles, scripts, maps...",
+    "online.search_ph": "Search, or leave empty to browse the category feed",
     "online.source_gta5mods": "GTA5-Mods",
     "online.source_nexus": "Nexus Mods",
+    "online.category_vehicles": "Vehicles",
+    "online.category_weapons": "Weapons",
+    "online.category_maps": "Maps",
+    "online.category_scripts": "Scripts",
+    "online.category_player": "Player",
+    "online.category_misc": "Misc",
+    "online.category_tools": "Tools",
     "online.card_paste": "Paste a link",
     "online.url_ph": "Mod page URL or direct .zip / .rar / .7z download",
     "online.download_url": "Download link",
@@ -567,11 +628,14 @@ _EN: dict[str, str] = {
     "online.col_title": "Mod",
     "online.col_author": "Author",
     "online.col_category": "Category",
-    "online.col_stats": "Stats",
+    "online.col_stats": "Downloads",
     "online.download": "Download / Install",
     "online.open_page": "Open page",
-    "online.empty": "Search to list mods, or paste a download URL above.",
+    "online.empty": "Pick a category to browse, search by name, or paste a download URL above.",
     "online.tips": (
+        "Browse Vehicles / Weapons / Maps / Scripts without typing a search. "
+        "Add-on DLC packs (content.xml + setup2.xml / dlc.rpf) install into mods "
+        "dlcpacks automatically. Loose map/weapon files still need OpenIV. "
         "GTA5-Mods often needs their timed download button — the tool opens the page "
         "when a direct file link is blocked. Nexus API downloads need Premium; otherwise "
         "the Files tab opens so you can download and drag the archive onto Install."
@@ -720,19 +784,37 @@ _VI: dict[str, str] = {
     "dashboard.title": "Bảng điều khiển",
     "dashboard.subtitle": "Tình trạng cài đặt, thư viện mod và hoạt động gần đây.",
     "install.title": "Cài mod",
-    "install.subtitle": "Kéo thả file nén vào, xem trước mọi thay đổi, rồi xác nhận.",
+    "install.subtitle": (
+        "Kéo thả file nén vào, xem trước mọi thay đổi, rồi xác nhận. "
+        "Xe, vũ khí, map (add-on DLC), ped và script được cài tự động."
+    ),
     "library.title": "Mod đã cài",
     "library.subtitle": (
         "Mọi file liệt kê ở đây do tool ghi và có thể gỡ chính xác từng file."
     ),
     "library.search_ph": "Tìm theo tên, loại hoặc spawn code",
-    "library.card": "Thư viện",
+    "library.card": "Mod của bạn",
     "library.details": "Chi tiết",
     "library.verify": "Kiểm tra file",
     "library.disable": "Tắt",
     "library.enable": "Bật",
     "library.uninstall": "Gỡ cài đặt",
     "library.select_mod": "Chọn một mod",
+    "library.status_installed": "Đã cài",
+    "library.status_disabled": "Đã tắt",
+    "library.status_broken": "Thiếu / lệch file",
+    "library.status_available": "Có sẵn",
+    "library.status_files_missing": "Thiếu file",
+    "library.files_header": "Nội dung đã cài",
+    "library.files_state": "Trạng thái",
+    "library.working": "Đang xử lý...",
+    "library.spawn_tip": (
+        "Gõ mã này trong trainer (Menyoo / Simple Trainer) để spawn xe:\n{codes}"
+    ),
+    "library.disable_hint": (
+        "Tắt sẽ dời file lỏng ra khỏi thư mục game để không còn load. "
+        "Model trong archive dùng chung được trả về stock cho đến khi bạn cài lại."
+    ),
     "library.uninstall_title": "Gỡ mod",
     "library.uninstall_complete": "Gỡ xong",
     "library.uninstall_complete_body": (
@@ -877,7 +959,7 @@ _VI: dict[str, str] = {
         "game/SHVDN hiện tại."
     ),
     "diagnostics.finding.crash.script_error.fix": (
-        "Gỡ hoặc cập nhật mod chứa script này, hoặc cập nhật ScriptHookVDotNet."
+        "Dùng Sửa để tắt mod sở hữu script, hoặc gỡ/cập nhật mod / SHVDN."
     ),
     "diagnostics.finding.crash.script_load.title": "Script không nạp được: {names}",
     "diagnostics.finding.crash.script_load.detail": (
@@ -885,14 +967,14 @@ _VI: dict[str, str] = {
         "phụ thuộc (phiên bản ScriptHookVDotNet, NativeUI, ...)."
     ),
     "diagnostics.finding.crash.script_load.fix": (
-        "Cài/cập nhật thành phần phụ thuộc được nêu trong trích đoạn log."
+        "Cài dependency từ Bộ Essentials, hoặc tắt mod bị lỗi."
     ),
     "diagnostics.finding.crash.recent_mods.title": "Mod mới cài gần đây: {names}",
     "diagnostics.finding.crash.recent_mods.detail": (
         "Mod cài trong 48 giờ gần nhất là nghi phạm hàng đầu khi xuất hiện crash mới."
     ),
     "diagnostics.finding.crash.recent_mods.fix": (
-        "Nếu crash bắt đầu sau khi cài một trong các mod này, hãy gỡ mod đó trước."
+        "Dùng Sửa để tắt thật các mod mới rồi mở lại game."
     ),
     "diagnostics.finding.crash.no_evidence.title": (
         "Game crash nhưng không script nào để lại dấu vết"
@@ -1032,9 +1114,30 @@ _VI: dict[str, str] = {
     # Install view
     "install.card_plan": "Thao tác sẽ thực hiện",
     "install.col_action": "Thao tác",
-    "install.col_zone": "Khu vực",
-    "install.col_target": "Đích",
+    "install.col_zone": "Ghi vào đâu",
+    "install.col_target": "Đường dẫn đích",
     "install.col_detail": "Chi tiết",
+    "install.col_vehicle_source": "Nguồn",
+    "install.col_vehicle_handling": "Handling",
+    "install.col_vehicle_make": "Hãng",
+    "install.kind_confidence": "Nhận diện: {kind} (độ tin cậy {confidence})",
+    "install.kind_vehicle_addon": "Xe add-on",
+    "install.kind_vehicle_replace": "Xe replace",
+    "install.kind_ped": "Nhân vật / ped",
+    "install.kind_weapon": "Vũ khí",
+    "install.kind_map": "Bản đồ",
+    "install.kind_script": "Script",
+    "install.kind_asi": "Plugin ASI",
+    "install.kind_script_hook_dotnet": "Script ScriptHookVDotNet",
+    "install.kind_graphics": "Đồ họa",
+    "install.kind_lml": "Gói LML",
+    "install.kind_openiv_package": "Gói OpenIV",
+    "install.kind_menyoo": "Menyoo",
+    "install.kind_trainer": "Trainer",
+    "install.kind_zombie": "Zombie",
+    "install.kind_sound": "Âm thanh",
+    "install.kind_texture": "Gói texture",
+    "install.kind_unknown": "Không rõ loại",
     "install.card_package": "Gói mod",
     "install.tab_vehicles": "Xe",
     "install.tab_vehicles_n": "Xe ({count})",
@@ -1059,11 +1162,11 @@ _VI: dict[str, str] = {
     "install.variant_replace": "Replace (thay xe gốc)",
     "install.variant_required": "Tick Add-On, Replace, hoặc cả hai trước khi cài.",
     "install.zone_mods": "thư mục mods (an toàn)",
-    "install.zone_dlc": "mods/dlcpacks (an toàn)",
-    "install.zone_scripts": "scripts (cho phép)",
-    "install.zone_lml": "LML (cho phép)",
-    "install.zone_root": "gốc game (danh sách cho phép)",
-    "install.zone_external": "xếp ngoài game",
+    "install.zone_dlc": "DLC packs trong mods (an toàn)",
+    "install.zone_scripts": "thư mục scripts",
+    "install.zone_lml": "thư mục LML",
+    "install.zone_root": "Thư mục game (chỉ file được phép)",
+    "install.zone_external": "Xếp cho OpenIV (ngoài game)",
     "install.zone_outside_tip": (
         "Ghi ngoài thư mục mods vì chính sách an toàn cho phép"
     ),
@@ -1083,7 +1186,15 @@ _VI: dict[str, str] = {
     # Dashboard
     "dashboard.card_active": "Bản cài đang dùng",
     "dashboard.detecting": "Đang nhận diện...",
-    "dashboard.badge_checking": "Đang kiểm tra",
+    "dashboard.badge_checking": "Đang kiểm tra…",
+    "dashboard.badge_not_ready": "Cần sửa trước",
+    "dashboard.badge_ready_warn": "Sẵn sàng — có cảnh báo",
+    "dashboard.badge_ready": "Sẵn sàng chơi",
+    "dashboard.badge_not_detected": "Chọn thư mục game",
+    "dashboard.card_validation": "Vấn đề & chặn cài",
+    "dashboard.essentials_install": "Cài essentials còn thiếu",
+    "dashboard.essentials_mark_ok": "OK",
+    "dashboard.essentials_mark_missing": "Thiếu",
     "dashboard.change_folder": "Đổi thư mục...",
     "dashboard.redetect": "Quét lại",
     "dashboard.create_mods": "Tạo thư mục mods",
@@ -1094,6 +1205,10 @@ _VI: dict[str, str] = {
     "dashboard.launch_issues_more": "...và thêm {count} mục nữa.",
     "dashboard.launch_anyway_hint": "Vẫn mở game?",
     "dashboard.launch_started": "Đã mở {exe}. Chơi vui.",
+    "dashboard.essentials_card": "Bộ Essentials",
+    "dashboard.essentials_waiting": "Chọn thư mục GTA V để kiểm tra essentials Story Mode.",
+    "dashboard.essentials_install": "Cài essentials còn thiếu",
+    "dashboard.essentials_manual": "Mở trang ScriptHookV / OpenIV",
     "dashboard.stat_mods": "Mod đã cài",
     "dashboard.stat_mods_cap": "được thư viện theo dõi",
     "dashboard.stat_components": "Thành phần",
@@ -1105,12 +1220,12 @@ _VI: dict[str, str] = {
     "dashboard.col_status": "Trạng thái",
     "dashboard.col_version": "Phiên bản",
     "dashboard.col_location": "Vị trí",
-    "dashboard.card_validation": "Kiểm tra",
+    "dashboard.card_validation": "Vấn đề & chặn cài",
     "dashboard.meta": "{platform} — phiên bản {version} — phát hiện bởi {source}",
-    "dashboard.badge_not_ready": "Chưa sẵn sàng",
-    "dashboard.badge_ready_warn": "Sẵn sàng (có cảnh báo)",
-    "dashboard.badge_ready": "Sẵn sàng",
-    "dashboard.badge_not_detected": "Chưa phát hiện",
+    "dashboard.badge_not_ready": "Cần sửa trước",
+    "dashboard.badge_ready_warn": "Sẵn sàng — có cảnh báo",
+    "dashboard.badge_ready": "Sẵn sàng chơi",
+    "dashboard.badge_not_detected": "Chọn thư mục game",
     "dashboard.components_all": "đủ các thành phần thiết yếu",
     "dashboard.components_missing": "thiếu {count} thành phần thiết yếu",
     "dashboard.no_install": "Chưa chọn bản cài GTA V",
@@ -1197,9 +1312,13 @@ _VI: dict[str, str] = {
     "graphics.apply_level": "Áp cấp độ",
     "graphics.uninstall": "Gỡ mod",
     "graphics.status_unknown": "Đang kiểm tra đồ họa...",
-    "graphics.badge_installed": "Đã cài CuongVision Ultimate thành công",
+    "graphics.badge_short_installed": "Đã cài",
+    "graphics.badge_short_missing": "Chưa cài",
+    "graphics.badge_short_conflict": "Bị ENB chặn",
+    "graphics.badge_short_error": "Lỗi",
+    "graphics.badge_installed": "CuongVision Ultimate đang hoạt động",
     "graphics.badge_installed_unknown_level": "Đã cài thành công",
-    "graphics.badge_not_installed": "Chưa cài — chọn cấp rồi bấm Cài",
+    "graphics.badge_not_installed": "Chưa cài — bấm Cài để thêm CuongVision Ultimate",
     "graphics.badge_conflict": "Bị chặn — phát hiện ENB. Gỡ ENB trước khi cài CuongVision",
     "graphics.badge_error": "Có lỗi — xem chi tiết bên dưới",
     "graphics.card_textures": "Texture 2K chọn lọc (tùy chọn)",
@@ -1220,7 +1339,11 @@ _VI: dict[str, str] = {
     # Zombie game mode
     "zombie.title": "Chế độ Zombie",
     "zombie.subtitle": "Chế độ sinh tồn riêng kiểu Left 4 Dead cho GTA V Story Mode.",
-    "zombie.checking": "Đang kiểm tra Simple Zombies Reborn...",
+    "zombie.checking": "Đang kiểm tra…",
+    "zombie.badge_ready": "Sẵn sàng",
+    "zombie.badge_missing": "Thiếu essentials",
+    "zombie.badge_not_installed": "Chưa cài",
+    "zombie.badge_error": "Lỗi",
     "zombie.card_mode": "Simple Zombies Reborn 1.0.5f",
     "zombie.description": (
         "Bản rebuild tháng 5/2026 đã xác minh: horde đông bị thu hút bởi tiếng súng, zombie "
@@ -1249,9 +1372,16 @@ _VI: dict[str, str] = {
     # Online mods
     "online.title": "Mod online",
     "online.subtitle": "Tìm trên GTA5-Mods và Nexus Mods, rồi cài bằng pipeline an toàn sẵn có.",
-    "online.search_ph": "Tìm xe, script, map...",
+    "online.search_ph": "Tìm kiếm, hoặc để trống để xem bảng xếp hạng danh mục",
     "online.source_gta5mods": "GTA5-Mods",
     "online.source_nexus": "Nexus Mods",
+    "online.category_vehicles": "Phương tiện",
+    "online.category_weapons": "Vũ khí",
+    "online.category_maps": "Bản đồ",
+    "online.category_scripts": "Script",
+    "online.category_player": "Nhân vật",
+    "online.category_misc": "Khác",
+    "online.category_tools": "Công cụ",
     "online.card_paste": "Dán link",
     "online.url_ph": "Link trang mod hoặc link tải .zip / .rar / .7z",
     "online.download_url": "Tải link",
@@ -1263,11 +1393,14 @@ _VI: dict[str, str] = {
     "online.col_title": "Mod",
     "online.col_author": "Tác giả",
     "online.col_category": "Danh mục",
-    "online.col_stats": "Thống kê",
+    "online.col_stats": "Lượt tải",
     "online.download": "Tải / Cài",
     "online.open_page": "Mở trang",
-    "online.empty": "Tìm kiếm để liệt kê mod, hoặc dán link tải ở trên.",
+    "online.empty": "Chọn danh mục để duyệt, tìm theo tên, hoặc dán link tải ở trên.",
     "online.tips": (
+        "Duyệt Phương tiện / Vũ khí / Map / Script mà không cần gõ tìm. "
+        "Pack add-on DLC (content.xml + setup2.xml / dlc.rpf) được cài tự động vào "
+        "mods/dlcpacks. File map/vũ khí lỏng vẫn cần OpenIV. "
         "GTA5-Mods thường bắt bấm nút tải có đếm giờ — tool sẽ mở trang khi không lấy "
         "được link file trực tiếp. Nexus API tải thẳng cần Premium; không thì mở tab "
         "Files để tải rồi kéo file vào Cài mod."

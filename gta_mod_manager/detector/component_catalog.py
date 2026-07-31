@@ -114,6 +114,7 @@ def default_catalog() -> tuple[ComponentProbe, ...]:
                 component_id=constants.COMPONENT_NATIVE_UI,
                 display_name="NativeUI",
                 required_by=("Menu based scripts",),
+                homepage="https://github.com/Guad/NativeUI/releases/tag/1.9.1",
             ),
             root_files=("NativeUI.dll", "scripts/NativeUI.dll"),
             version_from="scripts/NativeUI.dll",
