@@ -29,6 +29,7 @@ _PAGE_KEYS = (
     "installed",
     "spawn",
     "graphics",
+    "zombie",
     "conflicts",
     "diagnostics",
     "backup",

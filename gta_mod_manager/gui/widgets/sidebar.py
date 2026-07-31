@@ -42,6 +42,7 @@ DEFAULT_NAV_ITEMS: tuple[NavItem, ...] = (
     NavItem("spawn", "nav.spawn"),
     NavItem("graphics", "nav.graphics"),
     NavItem("conflicts", "nav.conflicts"),
+    NavItem("zombie", "nav.zombie", section_key="nav.game_modes"),
     NavItem("backup", "nav.backup", section_key="nav.safety"),
     NavItem("diagnostics", "nav.diagnostics"),
     NavItem("logs", "nav.logs"),

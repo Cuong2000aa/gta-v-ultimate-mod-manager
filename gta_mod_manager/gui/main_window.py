@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
 from PySide6.QtGui import QCloseEvent, QDragEnterEvent, QDropEvent, QResizeEvent
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -35,6 +34,7 @@ from gta_mod_manager.gui.viewmodels.log_vm import LogViewModel
 from gta_mod_manager.gui.viewmodels.online_vm import OnlineViewModel
 from gta_mod_manager.gui.viewmodels.settings_vm import SettingsViewModel
 from gta_mod_manager.gui.viewmodels.spawn_vm import SpawnViewModel
+from gta_mod_manager.gui.viewmodels.zombie_vm import ZombieViewModel
 from gta_mod_manager.gui.views.backup_view import BackupView
 from gta_mod_manager.gui.views.conflict_view import ConflictView
 from gta_mod_manager.gui.views.dashboard_view import DashboardView
@@ -46,6 +46,7 @@ from gta_mod_manager.gui.views.log_view import LogView
 from gta_mod_manager.gui.views.online_view import OnlineView
 from gta_mod_manager.gui.views.settings_view import SettingsView
 from gta_mod_manager.gui.views.spawn_view import SpawnView
+from gta_mod_manager.gui.views.zombie_view import ZombieView
 from gta_mod_manager.gui.widgets.sidebar import Sidebar
 from gta_mod_manager.gui.widgets.toast import ToastHost
 from gta_mod_manager.gui.workers import TaskRunner
@@ -111,6 +112,9 @@ class MainWindow(QMainWindow):
         self._graphics_vm = GraphicsViewModel(
             self._runner, app.graphics, app.game, self
         )
+        self._zombie_vm = ZombieViewModel(
+            self._runner, app.zombie, app.launch, self
+        )
         self._backup_vm = BackupViewModel(self._runner, app.backups, self._reporter, self)
         self._conflict_vm = ConflictViewModel(self._runner, app.conflicts, app.game, self)
         self._diagnostics_vm = DiagnosticsViewModel(
@@ -153,6 +157,7 @@ class MainWindow(QMainWindow):
         self._library = LibraryView(self._library_vm)
         self._spawn = SpawnView(self._spawn_vm)
         self._graphics = GraphicsView(self._graphics_vm)
+        self._zombie = ZombieView(self._zombie_vm)
         self._conflicts = ConflictView(self._conflict_vm)
         self._diagnostics = DiagnosticsView(self._diagnostics_vm)
         self._backups = BackupView(self._backup_vm)
@@ -167,6 +172,7 @@ class MainWindow(QMainWindow):
             ("installed", self._library),
             ("spawn", self._spawn),
             ("graphics", self._graphics),
+            ("zombie", self._zombie),
             ("conflicts", self._conflicts),
             ("diagnostics", self._diagnostics),
             ("backup", self._backups),
@@ -224,6 +230,7 @@ class MainWindow(QMainWindow):
             self._library_vm,
             self._spawn_vm,
             self._graphics_vm,
+            self._zombie_vm,
             self._backup_vm,
             self._conflict_vm,
             self._diagnostics_vm,
@@ -246,6 +253,7 @@ class MainWindow(QMainWindow):
             "installed": self._library.refresh,
             "spawn": self._spawn.refresh,
             "graphics": self._graphics.refresh,
+            "zombie": self._zombie.refresh,
             "conflicts": self._conflicts.refresh,
             "diagnostics": self._diagnostics.refresh,
             "backup": self._backups.refresh,

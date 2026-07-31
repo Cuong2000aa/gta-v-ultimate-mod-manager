@@ -30,6 +30,8 @@ _EN: dict[str, str] = {
     "nav.installed": "Installed Mods",
     "nav.spawn": "Spawn Center",
     "nav.graphics": "Graphics Mods",
+    "nav.game_modes": "Game modes",
+    "nav.zombie": "Zombie Mode",
     "nav.conflicts": "Conflict Center",
     "nav.backup": "Backup & Restore",
     "nav.diagnostics": "Game Diagnostics",
@@ -519,6 +521,35 @@ _EN: dict[str, str] = {
         "distant roads. The single Ultimate profile protects whites, preserves shadow "
         "detail and uses one restrained sharpening pass."
     ),
+    # Zombie game mode
+    "zombie.title": "Zombie Mode",
+    "zombie.subtitle": "A separate Left 4 Dead-style survival mode for GTA V Story Mode.",
+    "zombie.checking": "Checking Simple Zombies Reborn...",
+    "zombie.card_mode": "Simple Zombies Reborn 1.0.5f",
+    "zombie.description": (
+        "Verified May 2026 rebuild: dense sound-driven hordes, fast and special infected, "
+        "survivors, crafting, hunger/thirst, vehicles and a persistent apocalypse profile. "
+        "The manager verifies SHA-256 and backs up an existing install before changes."
+    ),
+    "zombie.install": "Install / update Zombie Mode",
+    "zombie.uninstall": "Back up & uninstall",
+    "zombie.launch": "Launch GTA V",
+    "zombie.card_controls": "How to play",
+    "zombie.controls": (
+        "In Story Mode press F10 → enable Infection Mode. Press I for inventory, C to "
+        "craft, F for recipes, and E near a survivor to configure them. Gunfire attracts "
+        "larger hordes. Disable Infection Mode before returning to normal Story Mode."
+    ),
+    "zombie.card_notes": "Compatibility",
+    "zombie.notes": (
+        "Single-player only; never enter GTA Online with script mods. ScriptHookV, "
+        "ScriptHookVDotNet v2 and NativeUI are required. iFruitAddon2 is optional and "
+        "only enables the military convoy phone contact."
+    ),
+    "zombie.ready": "Ready — Simple Zombies Reborn {version} is installed",
+    "zombie.missing": "Installed, but missing dependencies: {dependencies}",
+    "zombie.not_installed": "Not installed",
+    "zombie.error": "Zombie Mode error — see details below",
     # Online mods
     "online.title": "Online Mods",
     "online.subtitle": "Search GTA5-Mods and Nexus Mods, then install with the same safe pipeline.",
@@ -588,6 +619,8 @@ _VI: dict[str, str] = {
     "nav.installed": "Mod đã cài",
     "nav.spawn": "Trung tâm spawn",
     "nav.graphics": "Mod đồ họa",
+    "nav.game_modes": "Chế độ chơi",
+    "nav.zombie": "Chế độ Zombie",
     "nav.conflicts": "Trung tâm xung đột",
     "nav.backup": "Sao lưu & Khôi phục",
     "nav.diagnostics": "Chẩn đoán game",
@@ -1184,6 +1217,35 @@ _VI: dict[str, str] = {
         "Ultimate duy nhất sẽ giữ vùng trắng, mở chi tiết vùng tối và chỉ dùng một lượt "
         "sharpen vừa đủ."
     ),
+    # Zombie game mode
+    "zombie.title": "Chế độ Zombie",
+    "zombie.subtitle": "Chế độ sinh tồn riêng kiểu Left 4 Dead cho GTA V Story Mode.",
+    "zombie.checking": "Đang kiểm tra Simple Zombies Reborn...",
+    "zombie.card_mode": "Simple Zombies Reborn 1.0.5f",
+    "zombie.description": (
+        "Bản rebuild tháng 5/2026 đã xác minh: horde đông bị thu hút bởi tiếng súng, zombie "
+        "nhanh và đặc biệt, đồng đội, chế tạo, đói/khát, xe và hồ sơ tận thế riêng. Tool "
+        "kiểm tra SHA-256 và sao lưu bản cũ trước khi thay đổi."
+    ),
+    "zombie.install": "Cài / cập nhật chế độ Zombie",
+    "zombie.uninstall": "Sao lưu & gỡ",
+    "zombie.launch": "Mở GTA V",
+    "zombie.card_controls": "Cách chơi",
+    "zombie.controls": (
+        "Trong Story Mode nhấn F10 → bật Infection Mode. Nhấn I mở túi đồ, C chế tạo, "
+        "F xem công thức, E gần đồng đội để chỉnh lệnh. Tiếng súng sẽ kéo horde lớn tới. "
+        "Tắt Infection Mode trước khi quay lại Story Mode bình thường."
+    ),
+    "zombie.card_notes": "Tương thích",
+    "zombie.notes": (
+        "Chỉ chơi đơn; tuyệt đối không vào GTA Online khi đang bật script mod. Cần "
+        "ScriptHookV, ScriptHookVDotNet v2 và NativeUI. iFruitAddon2 chỉ là tùy chọn cho "
+        "liên lạc đoàn xe quân sự qua điện thoại."
+    ),
+    "zombie.ready": "Sẵn sàng — đã cài Simple Zombies Reborn {version}",
+    "zombie.missing": "Đã cài nhưng còn thiếu: {dependencies}",
+    "zombie.not_installed": "Chưa cài",
+    "zombie.error": "Chế độ Zombie bị lỗi — xem chi tiết bên dưới",
     # Online mods
     "online.title": "Mod online",
     "online.subtitle": "Tìm trên GTA5-Mods và Nexus Mods, rồi cài bằng pipeline an toàn sẵn có.",
