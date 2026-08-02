@@ -131,3 +131,88 @@ def test_plan_prefers_replace_over_backup_for_same_member(tmp_path: Path) -> Non
     assert any(path.endswith("Replace/gauntlet.yft") for path in sources)
     assert any(path.endswith("Replace/gauntlet.ytd") for path in sources)
     assert not any("Backup" in path for path in sources)
+
+
+def _write_mpbusiness_dlc(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with RpfArchive.empty("mpbusiness") as outer:
+        _entry, nested = outer.add_nested_archive(
+            "x64/levels/gta5/vehicles/mpbusinessvehicles.rpf"
+        )
+        nested.add("turismor.yft", b"VANILLA")
+        nested.add("turismor.ytd", b"VANILLA")
+        outer.encryption = OPEN_ENCRYPTION
+        outer.save(str(path))
+
+
+def test_turismor_replace_plans_copy_of_mpbusiness_dlc(tmp_path: Path) -> None:
+    game_root = tmp_path / "game"
+    game_root.mkdir()
+    (game_root / "GTA5.exe").write_bytes(b"exe")
+    _write_vehicle_stream_archive(game_root / "x64e.rpf")
+    _write_mpbusiness_dlc(game_root / "update" / "x64" / "dlcpacks" / "mpbusiness" / "dlc.rpf")
+    mods = game_root / "mods"
+    workspace = tmp_path / "workspace"
+    paths = AppPaths(root=tmp_path / "appdata").ensure()
+
+    package = _package(workspace, "turismor.yft", "turismor.ytd")
+    install = GameInstall(game_id="gta_v", root_path=game_root, platform=GamePlatform.MANUAL)
+    plan = GtaVPlanBuilder().build(
+        PlanRequest(package=package, install=install, paths=paths)
+    )
+
+    copies = [op for op in plan.operations if op.action is FileAction.RPF_COPY]
+    imports = [op for op in plan.operations if op.action is FileAction.RPF_IMPORT]
+    assert copies
+    assert copies[0].target_path == mods / "update" / "x64" / "dlcpacks" / "mpbusiness" / "dlc.rpf"
+    assert copies[0].source_path == (
+        game_root / "update" / "x64" / "dlcpacks" / "mpbusiness" / "dlc.rpf"
+    )
+    assert len(imports) == 1
+    assert imports[0].target_path == copies[0].target_path
+    assert all(
+        "mpbusinessvehicles.rpf/" in member.member_path
+        for member in imports[0].archive_members
+    )
+
+
+def _write_patchday_turismor(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with RpfArchive.empty("patchday") as outer:
+        _entry, nested = outer.add_nested_archive("x64/levels/gta5/vehicles.rpf")
+        nested.add("turismor.yft", b"VANILLA")
+        nested.add("turismor.ytd", b"VANILLA")
+        outer.encryption = OPEN_ENCRYPTION
+        outer.save(str(path))
+
+
+def test_missing_mpbusiness_retargets_to_patchday_home(tmp_path: Path) -> None:
+    """Modern installs fold Turismo R into patchday*; plan must not go empty."""
+    game_root = tmp_path / "game"
+    game_root.mkdir()
+    (game_root / "GTA5.exe").write_bytes(b"exe")
+    _write_vehicle_stream_archive(game_root / "x64e.rpf")
+    _write_patchday_turismor(
+        game_root / "update" / "x64" / "dlcpacks" / "patchday27ng" / "dlc.rpf"
+    )
+    mods = game_root / "mods"
+    workspace = tmp_path / "workspace"
+    paths = AppPaths(root=tmp_path / "appdata").ensure()
+
+    package = _package(workspace, "turismor.yft", "turismor.ytd")
+    install = GameInstall(game_id="gta_v", root_path=game_root, platform=GamePlatform.MANUAL)
+    plan = GtaVPlanBuilder().build(
+        PlanRequest(package=package, install=install, paths=paths)
+    )
+
+    assert plan.operations
+    imports = [op for op in plan.operations if op.action is FileAction.RPF_IMPORT]
+    assert len(imports) == 1
+    assert imports[0].target_path == (
+        mods / "update" / "x64" / "dlcpacks" / "patchday27ng" / "dlc.rpf"
+    )
+    assert all(
+        member.member_path.startswith("x64/levels/gta5/vehicles.rpf/turismor")
+        for member in imports[0].archive_members
+    )
+    assert any("retargeted" in note.lower() or "missing" in note.lower() for note in plan.notes)

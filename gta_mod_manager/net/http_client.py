@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import http.cookiejar
 import json
 import ssl
 import urllib.error
@@ -19,10 +20,18 @@ _LOGGER = get_logger("net.http")
 ProgressCallback = Callable[[int, int | None], None]
 
 
-def build_opener() -> urllib.request.OpenerDirector:
+def build_opener(
+    *,
+    cookie_jar: http.cookiejar.CookieJar | None = None,
+) -> urllib.request.OpenerDirector:
     """Return an opener that tolerates common TLS setups."""
     context = ssl.create_default_context()
-    return urllib.request.build_opener(urllib.request.HTTPSHandler(context=context))
+    handlers: list[urllib.request.BaseHandler] = [
+        urllib.request.HTTPSHandler(context=context),
+    ]
+    if cookie_jar is not None:
+        handlers.insert(0, urllib.request.HTTPCookieProcessor(cookie_jar))
+    return urllib.request.build_opener(*handlers)
 
 
 def request_json(
@@ -42,9 +51,12 @@ def request_text(
     headers: Mapping[str, str] | None = None,
     timeout: float = 30.0,
     encoding: str = "utf-8",
+    cookie_jar: http.cookiejar.CookieJar | None = None,
 ) -> str:
     """GET ``url`` and decode a text body."""
-    raw = request_bytes(url, headers=headers, timeout=timeout)
+    raw = request_bytes(
+        url, headers=headers, timeout=timeout, cookie_jar=cookie_jar
+    )
     return raw.decode(encoding, errors="replace")
 
 
@@ -53,10 +65,11 @@ def request_bytes(
     *,
     headers: Mapping[str, str] | None = None,
     timeout: float = 30.0,
+    cookie_jar: http.cookiejar.CookieJar | None = None,
 ) -> bytes:
     """GET ``url`` and return the raw response body."""
     request = urllib.request.Request(url, headers=_with_user_agent(headers), method="GET")
-    opener = build_opener()
+    opener = build_opener(cookie_jar=cookie_jar)
     try:
         with opener.open(request, timeout=timeout) as response:
             return response.read()
@@ -74,12 +87,13 @@ def download_file(
     headers: Mapping[str, str] | None = None,
     timeout: float = 120.0,
     on_progress: ProgressCallback | None = None,
+    cookie_jar: http.cookiejar.CookieJar | None = None,
 ) -> Path:
     """Stream ``url`` into ``destination``, creating parents as needed."""
     destination.parent.mkdir(parents=True, exist_ok=True)
     partial = destination.with_suffix(destination.suffix + ".part")
     request = urllib.request.Request(url, headers=_with_user_agent(headers), method="GET")
-    opener = build_opener()
+    opener = build_opener(cookie_jar=cookie_jar)
     try:
         with opener.open(request, timeout=timeout) as response:
             total_header = response.headers.get("Content-Length")
@@ -125,7 +139,11 @@ def is_archive_filename(name: str) -> bool:
 
 
 def _with_user_agent(headers: Mapping[str, str] | None) -> dict[str, str]:
-    merged = {"User-Agent": constants.ONLINE_USER_AGENT}
+    merged = {
+        "User-Agent": constants.ONLINE_USER_AGENT,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+    }
     if headers:
         merged.update(dict(headers))
     return merged

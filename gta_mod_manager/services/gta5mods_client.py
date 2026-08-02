@@ -1,11 +1,12 @@
 """Lightweight GTA5-Mods.com search / page helpers.
 
-There is no public API. We parse public HTML carefully and fall back to the
-browser when a direct CDN link is not available (captcha / timed download).
+There is no public API. We parse public HTML and resolve the timed-download
+page (``…/download/{id}``) to a ``files.gta5-mods.com`` CDN URL in-app.
 """
 
 from __future__ import annotations
 
+import http.cookiejar
 import re
 from html import unescape
 from urllib.parse import quote, urljoin
@@ -41,11 +42,27 @@ _DOWNLOADS = re.compile(
     r'title="([\d,]+)\s+Downloads"',
     re.IGNORECASE,
 )
+#: CDN archive links (optional query string / protocol-relative).
 _FILE_CDN = re.compile(
-    r'https://files\.gta5-mods\.com/[^\s"\'<>]+\.(?:zip|rar|7z|oiv)',
+    r'(?:https?:)?//files\.gta5-mods\.com/[^\s"\'<>]+?\.(?:zip|rar|7z|oiv)'
+    r'(?:\?[^\s"\'<>]*)?',
+    re.IGNORECASE,
+)
+#: Primary Download button — ``href`` before or after ``class``.
+_BTN_DOWNLOAD = re.compile(
+    r'<a[^>]*href="([^"]+/download/\d+)"[^>]*class="[^"]*btn-download'
+    r'|<a[^>]*class="[^"]*btn-download[^"]*"[^>]*href="([^"]+/download/\d+)"',
+    re.IGNORECASE,
+)
+#: Any version download link (fallback when the primary button is missing).
+_ANY_DOWNLOAD = re.compile(
+    r'href="((?:https://www\.gta5-mods\.com)?'
+    r"/(?:[a-z]{2}/)?(?:vehicles|weapons|maps|misc|scripts|player|mods|tools|"
+    r'paint-jobs|paintjobs|liveries)/[^"/]+/download/\d+)"',
     re.IGNORECASE,
 )
 _SKIP_SLUGS = frozenset({"tags", "user", "users", "login", "register"})
+_HTML_HEADERS = {"Accept": "text/html"}
 
 
 class Gta5ModsClient:
@@ -83,7 +100,7 @@ class Gta5ModsClient:
         try:
             html = http_client.request_text(
                 url,
-                headers={"Accept": "text/html"},
+                headers=_HTML_HEADERS,
                 timeout=30.0,
             )
         except RuntimeError as error:
@@ -99,42 +116,98 @@ class Gta5ModsClient:
         )
 
     def plan_download(self, listing: OnlineModListing) -> Result[OnlineDownloadPlan]:
-        """Prefer a CDN file URL; otherwise open the mod page in a browser."""
+        """Resolve a ``files.gta5-mods.com`` CDN URL without opening a browser.
+
+        Uses one cookie jar across the mod page and timed download page so the
+        site session (``_gta5-mods_session``) is preserved. When Cloudflare /
+        captcha blocks the CDN link, fall back to opening the page in a browser
+        instead of failing the background task hard.
+        """
         if listing.source is not OnlineSource.GTA5_MODS:
             return Result.fail("Not a GTA5-Mods listing", code="online.wrong_source")
+
+        jar = http.cookiejar.CookieJar()
         try:
             html = http_client.request_text(
                 listing.page_url,
-                headers={"Accept": "text/html"},
+                headers=_HTML_HEADERS,
                 timeout=30.0,
+                cookie_jar=jar,
             )
         except RuntimeError as error:
             return Result.fail(str(error), code="online.gta5mods_page_failed")
 
-        matches = _FILE_CDN.findall(html)
-        if matches:
-            url = matches[0]
+        cdn = self._first_cdn(html)
+        download_page = self._first_download_page_url(html, listing.page_url)
+        if cdn is None and download_page is not None:
+            try:
+                timed_html = http_client.request_text(
+                    download_page,
+                    headers={
+                        **_HTML_HEADERS,
+                        "Referer": listing.page_url,
+                    },
+                    timeout=30.0,
+                    cookie_jar=jar,
+                )
+            except RuntimeError as error:
+                return Result.fail(
+                    str(error),
+                    code="online.gta5mods_download_page_failed",
+                )
+            cdn = self._first_cdn(timed_html)
+
+        if cdn is not None:
             return Result.ok(
                 OnlineDownloadPlan(
                     listing=listing,
                     mode=DownloadMode.DIRECT,
-                    download_url=url,
+                    download_url=cdn,
                     suggested_filename=http_client.filename_from_url(
-                        url, fallback=f"gta5mods-{listing.mod_id}.zip"
+                        cdn, fallback=f"gta5mods-{listing.mod_id}.zip"
                     ),
                 )
             )
+
+        # Soft fallback: open the timed download page (or mod page) in a browser.
+        open_url = download_page or listing.page_url
         return Result.ok(
             OnlineDownloadPlan(
                 listing=listing,
                 mode=DownloadMode.OPEN_BROWSER,
+                download_url=open_url,
                 message=(
-                    "GTA5-Mods requires their timed download page. Opening it in your "
-                    "browser — when the file finishes, drag it onto Install, or paste "
-                    "the final CDN link here."
+                    "Could not resolve a direct download link from GTA5-Mods "
+                    "(captcha or blocked page). Opening the site — download there, "
+                    "then paste the files.gta5-mods.com link into Online Mods."
                 ),
             )
         )
+
+    @staticmethod
+    def _first_cdn(html: str) -> str | None:
+        """Return the first archive CDN URL embedded in ``html``, if any."""
+        matches = _FILE_CDN.findall(html)
+        if not matches:
+            return None
+        raw = matches[0]
+        if raw.startswith("//"):
+            return "https:" + raw
+        return raw
+
+    @staticmethod
+    def _first_download_page_url(html: str, page_url: str) -> str | None:
+        """Pick the primary ``…/download/{id}`` URL from a mod page."""
+        match = _BTN_DOWNLOAD.search(html)
+        href = None
+        if match is not None:
+            href = match.group(1) or match.group(2)
+        if href is None:
+            any_match = _ANY_DOWNLOAD.search(html)
+            href = any_match.group(1) if any_match else None
+        if href is None:
+            return None
+        return urljoin(page_url, href)
 
     def _parse_listings(self, html: str, *, limit: int) -> tuple[OnlineModListing, ...]:
         """Extract mod cards from a search or category HTML page."""

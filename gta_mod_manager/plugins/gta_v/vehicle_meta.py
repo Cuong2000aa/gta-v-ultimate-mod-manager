@@ -57,8 +57,8 @@ _MODEL_NOISE_NAMES: frozenset[str] = frozenset(
     {"hi", "lod", "dlc", "vehicle", "vehicles", "template", "null", "prop"}
 )
 
-#: Naming used by tuning parts (``sesto_int_roll.yft``), which ride along in
-#: the same archive as the car but cannot be spawned.
+#: Naming used by tuning parts (``sesto_int_roll.yft``, ``cara2_bumfa.yft``),
+#: which ride along in the same archive as the car but cannot be spawned.
 _PART_NAME_FRAGMENTS: tuple[str, ...] = (
     "_int_",
     "_ext_",
@@ -70,6 +70,20 @@ _PART_NAME_FRAGMENTS: tuple[str, ...] = (
     "_roof",
     "_bumper",
     "_skirt",
+    "_bumf",
+    "_bumr",
+    "_bum",
+    "_hood",
+    "_grill",
+    "_exh",
+    "_liv",
+    "_arch",
+    "_split",
+    "_fend",
+    "_door",
+    "_mir",
+    "_seat",
+    "_steer",
 )
 
 #: Trainers reject anything shorter, and short matches are usually noise.
@@ -225,7 +239,9 @@ class VehicleMetaParser:
     ) -> list[VehicleDefinition]:
         """Return spawn codes drawn only from the Replace half of a dual package."""
         del packs  # replace installs do not use DLC packs
-        assets = self._infer_from_loose_assets(inventory, replace_only=True)
+        assets = self._drop_part_like(
+            self._infer_from_loose_assets(inventory, replace_only=True)
+        )
         if assets:
             return assets
 
@@ -305,9 +321,12 @@ class VehicleMetaParser:
 
         Replacement mods rename their model after the vanilla car they take
         over (``buffalo2.yft``), which *is* the spawn code the user needs.
+        Tuning parts usually ship as ``.yft`` only; real cars include a
+        matching ``.ytd``, so complete pairs win when both are present.
         """
-        found: dict[str, VehicleDefinition] = {}
-        for file in inventory.by_suffix(".yft"):
+        models: dict[str, VehicleDefinition] = {}
+        textures: set[str] = set()
+        for file in inventory.by_suffix(".yft", ".ytd"):
             if replace_only and not path_under_named_folders(
                 file.relative_path, REPLACE_VARIANT_NAMES
             ):
@@ -322,11 +341,19 @@ class VehicleMetaParser:
             ):
                 continue
             name = file.absolute_path.stem.lower()
-            if self._is_spawnable_model(name):
-                found.setdefault(
-                    name, VehicleDefinition(model_name=name, source_file=file.absolute_path)
-                )
-        return list(found.values())
+            if name.endswith("_hi"):
+                name = name[: -len("_hi")]
+            if not self._is_spawnable_model(name):
+                continue
+            if file.suffix == ".ytd":
+                textures.add(name)
+                continue
+            models.setdefault(
+                name, VehicleDefinition(model_name=name, source_file=file.absolute_path)
+            )
+        complete = {name: models[name] for name in models if name in textures}
+        preferred = complete or models
+        return list(preferred.values())
 
     def _parse_vehicles(
         self, inventory: FileInventory, repaired: list[Path]

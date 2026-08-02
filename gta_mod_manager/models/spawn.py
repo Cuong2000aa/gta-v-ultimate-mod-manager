@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 
 
@@ -27,3 +28,7 @@ class SpawnEntry:
     mod_id: str
     mod_name: str
     tip: str = ""
+    #: Analyzer / library category (e.g. ``vehicle_addon``, ``vehicle_replace``).
+    mod_kind: str = ""
+    #: When the owning mod was installed — used to list newest mods first.
+    installed_at: datetime | None = None

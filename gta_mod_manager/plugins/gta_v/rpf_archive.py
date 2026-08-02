@@ -39,6 +39,18 @@ _WRITABLE_ENCRYPTION = frozenset({NONE_ENCRYPTION, OPEN_ENCRYPTION})
 _DLC_VEHICLE_NESTED_PATHS = (
     "x64/levels/gta5/vehicles.rpf",
     "x64/levels/gta5/vehicles/vehicles.rpf",
+    "x64/levels/gta5/vehicles/mpbusinessvehicles.rpf",
+    "x64/levels/gta5/vehicles/mpbusiness2vehicles.rpf",
+)
+
+#: DLC packs that commonly host replaceable story-mode cars (read-only stock lookup).
+_COMMON_VEHICLE_DLC_PACKS = (
+    "mpbusiness",
+    "mpbusiness2",
+    "mpluxe",
+    "mpluxe2",
+    "mpchristmas2",
+    "mppilot",
 )
 
 
@@ -512,6 +524,10 @@ def _stock_archive_candidates(stock_archive: Path, game_root: Path) -> tuple[Pat
             if (path / "dlc.rpf").is_file()
         ]
         candidates.extend(sorted(patchdays, key=_patchday_sort_key, reverse=True))
+        for pack_name in _COMMON_VEHICLE_DLC_PACKS:
+            candidate = dlcpacks / pack_name / "dlc.rpf"
+            if candidate.is_file():
+                candidates.append(candidate)
 
     for name in ("x64e.rpf", "x64w.rpf", "x64i.rpf"):
         candidate = game_root / name
@@ -536,7 +552,12 @@ def _patchday_sort_key(path: Path) -> tuple[int, int, str]:
 def _stock_nested_candidates(requested: str | None) -> tuple[str | None, ...]:
     """Return likely nested vehicle archives without duplicating paths."""
     values: list[str | None] = [requested]
-    if requested is not None and requested.lower().endswith("vehicles.rpf"):
+    lowered = (requested or "").lower()
+    if requested is not None and (
+        lowered.endswith("vehicles.rpf") or "/vehiclemods/" in lowered
+    ):
+        values.extend(_DLC_VEHICLE_NESTED_PATHS)
+    elif requested is None:
         values.extend(_DLC_VEHICLE_NESTED_PATHS)
     return tuple(dict.fromkeys(values))
 

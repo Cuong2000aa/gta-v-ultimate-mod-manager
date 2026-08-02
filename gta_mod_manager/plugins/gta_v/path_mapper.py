@@ -20,6 +20,7 @@ from gta_mod_manager.core.script_assets import SCRIPT_SIDECAR_SUFFIXES
 from gta_mod_manager.models.enums import InstallTarget
 from gta_mod_manager.plugins.contracts import TargetDecision
 from gta_mod_manager.plugins.gta_v.layout import PackageLayout, strip_to_game_anchor
+from gta_mod_manager.plugins.gta_v.replace_targets import resolve_replace_target
 from gta_mod_manager.plugins.gta_v.root_policy import RootInstallPolicy
 
 #: Files that carry no installable payload and are skipped silently.
@@ -60,6 +61,7 @@ class GtaVPathMapper:
         for resolver in (
             self._as_documentation,
             self._as_backup_folder_skip,
+            self._as_dlc_vehicle_replace,
             self._as_dlc_pack_member,
             self._as_game_structure,
             self._as_ped_armor_ini,
@@ -111,6 +113,35 @@ class GtaVPathMapper:
             reason=(
                 f"Skipped {relative_path.name} from backup/original/stock folder "
                 f"({relative_path.parent.as_posix() or '.'})"
+            ),
+        )
+
+    @staticmethod
+    def _as_dlc_vehicle_replace(
+        layout: PackageLayout, relative_path: PurePosixPath
+    ) -> TargetDecision | None:
+        """Import DLC-home replaces into ``mods/update/x64/dlcpacks/<pack>/dlc.rpf``.
+
+        Runs before ``_as_game_structure`` so paths like
+        ``x64w.rpf/dlcpacks/mpbusiness/dlc.rpf/.../turismor.yft`` are not copied
+        as loose files under ``mods/``.
+        """
+        if relative_path.suffix.lower() not in constants.VEHICLE_STREAM_EXTENSIONS:
+            return None
+        target = resolve_replace_target(
+            relative_path, readme_targets=layout.dlc_replace_hints
+        )
+        if target is None:
+            return None
+        member = target.member_path(relative_path.name)
+        return TargetDecision(
+            target=InstallTarget.MODS_FOLDER,
+            relative_target=target.relative_archive,
+            archive_member_path=member,
+            reason=(
+                f"Replace {relative_path.name} inside the mods copy of "
+                f"{target.relative_archive.as_posix()} ({target.nested_rpf}); "
+                "original untouched"
             ),
         )
 

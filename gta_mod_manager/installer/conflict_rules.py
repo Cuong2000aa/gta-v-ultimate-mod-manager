@@ -13,7 +13,12 @@ from gta_mod_manager.installer.vehicle_keys import (
     model_keys_from_archive_members,
 )
 from gta_mod_manager.models.conflict import Conflict
-from gta_mod_manager.models.enums import ConflictSeverity, ConflictType, FileAction
+from gta_mod_manager.models.enums import (
+    ConflictSeverity,
+    ConflictType,
+    FileAction,
+    ModKind,
+)
 from gta_mod_manager.models.game_install import GameInstall
 from gta_mod_manager.models.install_plan import FileOperation, InstallPlan
 from gta_mod_manager.models.mod_package import InstalledMod, ModPackage
@@ -194,14 +199,21 @@ class DuplicateVehicleRule(ConflictRule):
 
     @staticmethod
     def _incoming_keys(context: ConflictContext) -> set[str]:
-        """Spawn codes from meta plus model keys from planned RPF imports."""
+        """Spawn codes from vehicle mods plus model keys from planned RPF imports.
+
+        OpenIV handling packs (Drive V, etc.) ship full ``vehicles.meta`` files
+        that list every stock name — those must not block installation as if the
+        pack were replacing each car.
+        """
         keys: set[str] = set()
         if context.package is not None:
-            keys.update(
-                code.strip().lower()
-                for code in context.package.vehicles.spawn_codes
-                if code and code.strip()
-            )
+            kind = context.package.classification.primary
+            if kind in {ModKind.VEHICLE_ADDON, ModKind.VEHICLE_REPLACE}:
+                keys.update(
+                    code.strip().lower()
+                    for code in context.package.vehicles.spawn_codes
+                    if code and code.strip()
+                )
         for operation in context.plan.operations:
             if operation.action is not FileAction.RPF_IMPORT:
                 continue

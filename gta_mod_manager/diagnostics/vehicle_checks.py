@@ -54,6 +54,9 @@ def tracked_dlc_pack_names(installed: tuple[InstalledMod, ...] | list[InstalledM
             if cleaned:
                 names.add(cleaned)
         for record in mod.installed_files:
+            pack_from_target = _pack_name_from_mods_path(record.target_path)
+            if pack_from_target:
+                names.add(pack_from_target)
             for member in record.archive_members:
                 if not member.lower().startswith("dlclist:"):
                     continue
@@ -61,6 +64,39 @@ def tracked_dlc_pack_names(installed: tuple[InstalledMod, ...] | list[InstalledM
                 if pack:
                     names.add(pack)
     return names
+
+
+def stock_dlc_pack_names(game_root: Path) -> set[str]:
+    """Return pack folders that already exist in the vanilla game ``dlcpacks``.
+
+    Vehicle replaces often copy Rockstar packs (``patchday*``, ``mp*``, …) into
+    ``mods/update/x64/dlcpacks``. Those mirrors must not be treated as orphans.
+    """
+    vanilla = game_root / Path(*constants.DLC_PACKS_RELATIVE.split("/"))
+    if not vanilla.is_dir():
+        return set()
+    names: set[str] = set()
+    try:
+        for child in vanilla.iterdir():
+            if child.is_dir():
+                names.add(child.name.lower())
+    except OSError as error:
+        _LOGGER.warning("Could not list stock dlcpacks under %s: %s", vanilla, error)
+    return names
+
+
+def _pack_name_from_mods_path(path: Path) -> str | None:
+    """Extract ``dlcpacks/<name>`` when ``path`` is under the mods folder."""
+    parts = [part.lower() for part in path.parts]
+    try:
+        mods_index = parts.index(constants.MODS_FOLDER_NAME.lower())
+        dlc_index = parts.index("dlcpacks", mods_index + 1)
+    except ValueError:
+        return None
+    if dlc_index + 1 >= len(parts):
+        return None
+    name = parts[dlc_index + 1].strip()
+    return name or None
 
 
 def find_orphan_dlcpacks(
@@ -76,9 +112,11 @@ def find_orphan_dlcpacks(
     if not packs_dir.is_dir():
         return ()
 
-    tracked = tracked_dlc_pack_names(installed) | {
-        name.lower() for name in constants.KNOWN_EXTERNAL_DLC_PACKS
-    }
+    tracked = (
+        tracked_dlc_pack_names(installed)
+        | {name.lower() for name in constants.KNOWN_EXTERNAL_DLC_PACKS}
+        | stock_dlc_pack_names(game_root)
+    )
     orphans: list[OrphanDlcPack] = []
     try:
         children = sorted(packs_dir.iterdir(), key=lambda item: item.name.lower())

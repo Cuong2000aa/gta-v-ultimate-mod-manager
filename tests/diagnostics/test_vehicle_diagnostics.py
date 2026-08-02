@@ -95,6 +95,43 @@ def test_known_external_packs_are_not_orphans(tmp_path: Path) -> None:
     assert [item.pack_name for item in found] == ["straypack"]
 
 
+def test_stock_patchday_mods_mirror_is_not_orphan(tmp_path: Path) -> None:
+    """Replace installs copy Rockstar patchdays into mods — not leftovers."""
+    root = tmp_path / "game"
+    vanilla = root / "update" / "x64" / "dlcpacks" / "patchday27ng"
+    vanilla.mkdir(parents=True)
+    (vanilla / "dlc.rpf").write_bytes(b"stock")
+    mirrored = root / "mods" / "update" / "x64" / "dlcpacks" / "patchday27ng"
+    mirrored.mkdir(parents=True)
+    (mirrored / "dlc.rpf").write_bytes(b"mods")
+    orphan = root / "mods" / "update" / "x64" / "dlcpacks" / "hellcat"
+    orphan.mkdir(parents=True)
+
+    found = find_orphan_dlcpacks(root, ())
+    assert [item.pack_name for item in found] == ["hellcat"]
+
+
+def test_replace_target_path_marks_dlcpack_tracked(tmp_path: Path) -> None:
+    root = tmp_path / "game"
+    pack = root / "mods" / "update" / "x64" / "dlcpacks" / "patchday27ng"
+    pack.mkdir(parents=True)
+    (pack / "dlc.rpf").write_bytes(b"mods")
+    mod = InstalledMod(
+        mod_id="laferrari",
+        display_name="LaFerrari",
+        game_root=root,
+        kind="vehicle_replace",
+        installed_files=(
+            InstalledFileRecord(
+                target_path=pack / "dlc.rpf",
+                shared_archive=True,
+                archive_members=("x64/levels/gta5/vehicles.rpf/turismor.yft",),
+            ),
+        ),
+    )
+    assert find_orphan_dlcpacks(root, (mod,)) == ()
+
+
 def test_detects_binary_vehicle_stream_entries(tmp_path: Path) -> None:
     root = tmp_path / "game"
     mods = root / "mods"

@@ -14,7 +14,7 @@ from gta_mod_manager.core.progress import NullProgressReporter
 from gta_mod_manager.core.protocols import ProgressReporter
 from gta_mod_manager.installer.operations import OperationExecutor
 from gta_mod_manager.installer.transaction import Transaction
-from gta_mod_manager.models.enums import FileAction, ModStatus
+from gta_mod_manager.models.enums import FileAction, ModKind, ModStatus
 from gta_mod_manager.models.install_plan import FileOperation, InstallPlan
 from gta_mod_manager.models.mod_package import (
     CachedArchiveMember,
@@ -229,12 +229,13 @@ class InstallEngine:
         kind = "unknown"
 
         if package is not None:
-            spawn_codes = package.vehicles.spawn_codes
-            dlc_packs = tuple(pack.pack_name for pack in package.vehicles.dlc_packs)
-            vehicle_definitions = package.vehicles.vehicles
+            kind = package.classification.primary.value
             preview = package.preview_image
             source = package.source_path
-            kind = package.classification.primary.value
+            if package.classification.primary is not ModKind.PED:
+                spawn_codes = package.vehicles.spawn_codes
+                dlc_packs = tuple(pack.pack_name for pack in package.vehicles.dlc_packs)
+                vehicle_definitions = package.vehicles.vehicles
 
         return InstalledMod(
             mod_id=plan.package_id,

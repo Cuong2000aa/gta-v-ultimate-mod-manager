@@ -163,3 +163,32 @@ def test_tuning_parts_are_not_offered_as_spawn_codes(tmp_path: Path) -> None:
     manifest = VehicleMetaParser().parse(_inventory(tmp_path, "pack/dlc.rpf"))
 
     assert manifest.spawn_codes == ("sesto",)
+
+
+def test_replace_pack_keeps_only_the_real_car_not_tuning_parts(tmp_path: Path) -> None:
+    """F250-style Replace packs ship one caracara2.yft/.ytd plus dozens of parts."""
+    folder = tmp_path / "Replace"
+    folder.mkdir()
+    (folder / "caracara2.yft").write_bytes(b"car")
+    (folder / "caracara2.ytd").write_bytes(b"tex")
+    for name in (
+        "cara2_bumfa.yft",
+        "cara2_hooda.yft",
+        "cara2_liv1.yft",
+        "cara2_grilla.yft",
+        "cara2_winga.yft",
+    ):
+        (folder / name).write_bytes(b"part")
+
+    relative = [
+        "Replace/caracara2.yft",
+        "Replace/caracara2.ytd",
+        "Replace/cara2_bumfa.yft",
+        "Replace/cara2_hooda.yft",
+        "Replace/cara2_liv1.yft",
+        "Replace/cara2_grilla.yft",
+        "Replace/cara2_winga.yft",
+    ]
+    manifest = VehicleMetaParser().parse(_inventory(tmp_path, *relative))
+
+    assert manifest.spawn_codes == ("caracara2",)

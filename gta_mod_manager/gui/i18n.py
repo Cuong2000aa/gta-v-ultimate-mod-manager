@@ -644,9 +644,9 @@ _EN: dict[str, str] = {
         "Browse Vehicles / Weapons / Maps / Scripts without typing a search. "
         "Add-on DLC packs (content.xml + setup2.xml / dlc.rpf) install into mods "
         "dlcpacks automatically. Loose map/weapon files still need OpenIV. "
-        "GTA5-Mods often needs their timed download button — the tool opens the page "
-        "when a direct file link is blocked. Nexus API downloads need Premium; otherwise "
-        "the Files tab opens so you can download and drag the archive onto Install."
+        "GTA5-Mods downloads run inside the app (no browser). Nexus API downloads "
+        "need Premium; otherwise the Files tab opens so you can download and drag "
+        "the archive onto Install."
     ),
     "online.ready_install": "Downloaded {name} — opening Install...",
     "online.opened_browser": "Opened the download page in your browser.",
@@ -655,20 +655,30 @@ _EN: dict[str, str] = {
     "online.missing_file": "Downloaded file not found: {path}",
     # Spawn Center
     "spawn.title": "Spawn Center",
-    "spawn.subtitle": "Copy vehicle and ped spawn codes from your installed mods.",
+    "spawn.subtitle": "Browse vehicle and ped spawn codes by tab, then copy to clipboard.",
     "spawn.search_ph": "Search by code or mod name",
     "spawn.filter_all": "All",
     "spawn.filter_vehicles": "Vehicles",
     "spawn.filter_peds": "Peds",
+    "spawn.tab_all_n": "All ({count})",
+    "spawn.tab_vehicles_n": "Vehicles ({count})",
+    "spawn.tab_peds_n": "Peds ({count})",
     "spawn.card_codes": "Spawn codes",
     "spawn.col_code": "Code",
     "spawn.col_kind": "Type",
     "spawn.col_mod": "Mod",
-    "spawn.col_tip": "How to use",
+    "spawn.col_install": "Install type",
+    "spawn.install_addon": "Add-On",
+    "spawn.install_replace": "Replace",
+    "spawn.install_tuning": "Tuning",
+    "spawn.install_ped": "Ped",
+    "spawn.install_unknown": "Unknown",
     "spawn.copy": "Copy code",
     "spawn.copied": "Copied '{code}' to the clipboard",
     "spawn.count": "{count} spawn code(s)",
     "spawn.empty": "No spawn codes yet — install a vehicle or ped mod first.",
+    "spawn.empty_vehicles": "No vehicle spawn codes yet — install a vehicle mod first.",
+    "spawn.empty_peds": "No ped spawn codes yet — install a ped / character mod first.",
     "spawn.kind_vehicle": "Vehicle",
     "spawn.kind_ped": "Ped",
     "spawn.card_tips": "How to spawn",
@@ -1416,9 +1426,8 @@ _VI: dict[str, str] = {
         "Duyệt Phương tiện / Vũ khí / Map / Script mà không cần gõ tìm. "
         "Pack add-on DLC (content.xml + setup2.xml / dlc.rpf) được cài tự động vào "
         "mods/dlcpacks. File map/vũ khí lỏng vẫn cần OpenIV. "
-        "GTA5-Mods thường bắt bấm nút tải có đếm giờ — tool sẽ mở trang khi không lấy "
-        "được link file trực tiếp. Nexus API tải thẳng cần Premium; không thì mở tab "
-        "Files để tải rồi kéo file vào Cài mod."
+        "GTA5-Mods tải ngay trong app (không mở trình duyệt). Nexus API tải thẳng "
+        "cần Premium; không thì mở tab Files để tải rồi kéo file vào Cài mod."
     ),
     "online.ready_install": "Đã tải {name} — đang mở Cài mod...",
     "online.opened_browser": "Đã mở trang tải trên trình duyệt.",
@@ -1427,20 +1436,30 @@ _VI: dict[str, str] = {
     "online.missing_file": "Không thấy file đã tải: {path}",
     # Spawn Center
     "spawn.title": "Trung tâm spawn",
-    "spawn.subtitle": "Copy mã spawn xe và ped từ các mod đã cài.",
+    "spawn.subtitle": "Xem mã spawn theo tab Phương tiện / Ped, rồi copy vào clipboard.",
     "spawn.search_ph": "Tìm theo mã hoặc tên mod",
     "spawn.filter_all": "Tất cả",
-    "spawn.filter_vehicles": "Xe",
+    "spawn.filter_vehicles": "Phương tiện",
     "spawn.filter_peds": "Ped",
+    "spawn.tab_all_n": "Tất cả ({count})",
+    "spawn.tab_vehicles_n": "Phương tiện ({count})",
+    "spawn.tab_peds_n": "Ped ({count})",
     "spawn.card_codes": "Mã spawn",
     "spawn.col_code": "Mã",
     "spawn.col_kind": "Loại",
     "spawn.col_mod": "Mod",
-    "spawn.col_tip": "Cách dùng",
+    "spawn.col_install": "Kiểu cài",
+    "spawn.install_addon": "Add-On",
+    "spawn.install_replace": "Replace",
+    "spawn.install_tuning": "Tuning",
+    "spawn.install_ped": "Ped",
+    "spawn.install_unknown": "Không rõ",
     "spawn.copy": "Copy mã",
     "spawn.copied": "Đã copy '{code}' vào clipboard",
     "spawn.count": "{count} mã spawn",
     "spawn.empty": "Chưa có mã spawn — hãy cài mod xe hoặc ped trước.",
+    "spawn.empty_vehicles": "Chưa có mã spawn xe — hãy cài mod phương tiện trước.",
+    "spawn.empty_peds": "Chưa có mã spawn ped — hãy cài mod ped / nhân vật trước.",
     "spawn.kind_vehicle": "Xe",
     "spawn.kind_ped": "Ped",
     "spawn.card_tips": "Cách spawn",

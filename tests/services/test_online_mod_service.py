@@ -109,6 +109,64 @@ def test_gta5mods_plan_prefers_cdn_link(monkeypatch) -> None:
     assert plan.download_url.endswith("demo-pack.zip")
 
 
+def test_gta5mods_plan_resolves_timed_download_page(monkeypatch) -> None:
+    listing = OnlineModListing(
+        source=OnlineSource.GTA5_MODS,
+        mod_id="demo",
+        title="Demo",
+        page_url="https://www.gta5-mods.com/vehicles/demo",
+    )
+    mod_page = (
+        '<html><a href="/vehicles/demo/download/99" '
+        'class="btn btn-primary btn-download">Download</a></html>'
+    )
+    timed_page = (
+        '<html><a class="btn btn-primary btn-download" '
+        'href="https://files.gta5-mods.com/uploads/demo/pack.rar">'
+        "Download</a></html>"
+    )
+    calls: list[str] = []
+
+    def fake_request_text(url: str, **_kwargs):  # noqa: ANN003
+        calls.append(url)
+        if url.rstrip("/").endswith("/download/99"):
+            return timed_page
+        return mod_page
+
+    monkeypatch.setattr(http_client, "request_text", fake_request_text)
+    plan = Gta5ModsClient().plan_download(listing).unwrap()
+    assert plan.mode is DownloadMode.DIRECT
+    assert plan.download_url.endswith("pack.rar")
+    assert any(url.endswith("/download/99") for url in calls)
+
+
+def test_gta5mods_plan_falls_back_to_browser_without_cdn(monkeypatch) -> None:
+    listing = OnlineModListing(
+        source=OnlineSource.GTA5_MODS,
+        mod_id="demo",
+        title="Demo",
+        page_url="https://www.gta5-mods.com/vehicles/demo",
+    )
+    monkeypatch.setattr(
+        http_client,
+        "request_text",
+        lambda *_a, **_k: "<html><body>captcha</body></html>",
+    )
+    plan = Gta5ModsClient().plan_download(listing).unwrap()
+    assert plan.mode is DownloadMode.OPEN_BROWSER
+    assert "captcha" in plan.message.lower() or "paste" in plan.message.lower()
+
+
+def test_gta5mods_cdn_accepts_query_and_protocol_relative() -> None:
+    html = (
+        '<a href="//files.gta5-mods.com/uploads/demo/pack.zip?token=abc">'
+        "Download</a>"
+    )
+    assert Gta5ModsClient._first_cdn(html) == (
+        "https://files.gta5-mods.com/uploads/demo/pack.zip?token=abc"
+    )
+
+
 def test_nexus_requires_api_key() -> None:
     result = NexusModsClient("").search("trainer")
     assert result.is_error

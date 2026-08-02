@@ -15,6 +15,10 @@ from gta_mod_manager.core.ped_assets import is_ped_asset, ped_model_stems
 from gta_mod_manager.core.script_assets import script_assembly_paths
 from gta_mod_manager.models.mod_file import FileInventory
 from gta_mod_manager.models.variant_selection import VariantSelection
+from gta_mod_manager.plugins.gta_v.replace_targets import (
+    ReplaceTarget,
+    discover_readme_replace_targets,
+)
 from gta_mod_manager.utils import fs
 
 #: Path segments that mean "everything from here on mirrors the game folder".
@@ -99,6 +103,8 @@ class PackageLayout:
     )
     ped_model_names: frozenset[str] = field(default_factory=frozenset)
     script_assemblies: frozenset[PurePosixPath] = field(default_factory=frozenset)
+    #: Filename / ``*`` → DLC replace home from ReadMe OpenIV paths.
+    dlc_replace_hints: dict[str, ReplaceTarget] = field(default_factory=dict)
 
     @property
     def is_dual_variant(self) -> bool:
@@ -215,6 +221,7 @@ class PackageLayout:
             script_assemblies=script_assembly_paths(
                 (item.absolute_path, item.relative_path) for item in inventory.files
             ),
+            dlc_replace_hints=discover_readme_replace_targets(inventory),
         )
 
     @staticmethod

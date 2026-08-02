@@ -184,16 +184,60 @@ class GtaVPlanBuilder:
 
         operations: list[FileOperation] = []
         restore_notes: list[str] = []
+        # Preferred archive may be missing on modern installs (e.g. mpbusiness
+        # folded into patchday). Retarget those members before emitting ops.
+        resolved_archives: dict[Path, list[ArchiveMemberImport]] = {}
         for archive, members in by_archive.items():
-            original = request.install.root_path / archive.name
+            try:
+                relative = archive.relative_to(request.install.mods_path)
+            except ValueError:
+                relative = Path(archive.name)
+            original = request.install.root_path / relative
+            if archive.is_file() or original.is_file():
+                resolved_archives.setdefault(archive, []).extend(members)
+                continue
+            remapped, note = self._remap_imports_to_available_stock(
+                request.install.root_path,
+                request.install.mods_path,
+                preferred=relative.as_posix(),
+                members=members,
+            )
+            if note:
+                restore_notes.append(note)
+            for target_archive, remapped_members in remapped.items():
+                resolved_archives.setdefault(target_archive, []).extend(remapped_members)
+
+        for archive, members in resolved_archives.items():
+            try:
+                relative = archive.relative_to(request.install.mods_path)
+            except ValueError:
+                relative = Path(archive.name)
+            original = request.install.root_path / relative
             if not archive.is_file():
                 if not original.is_file():
                     _LOGGER.warning(
                         "Cannot auto-import into %s; original %s is missing",
-                        archive.name,
+                        relative.as_posix(),
                         original,
                     )
                     continue
+                parent = archive.parent
+                if not parent.is_dir():
+                    try:
+                        parent_label = parent.relative_to(request.install.mods_path).as_posix()
+                    except ValueError:
+                        parent_label = parent.name
+                    operations.append(
+                        FileOperation(
+                            action=FileAction.CREATE_DIRECTORY,
+                            target_path=parent,
+                            target_kind=InstallTarget.MODS_FOLDER,
+                            description=(
+                                f"Create {constants.MODS_FOLDER_NAME}/{parent_label} "
+                                "for the replace archive"
+                            ),
+                        )
+                    )
                 operations.append(
                     FileOperation(
                         action=FileAction.RPF_COPY,
@@ -201,7 +245,7 @@ class GtaVPlanBuilder:
                         source_path=original,
                         target_kind=InstallTarget.MODS_FOLDER,
                         description=(
-                            f"Copy {archive.name} into {constants.MODS_FOLDER_NAME}/ "
+                            f"Copy {relative.as_posix()} into {constants.MODS_FOLDER_NAME}/ "
                             "(original stays read-only)"
                         ),
                     )
@@ -213,7 +257,7 @@ class GtaVPlanBuilder:
                     target_kind=InstallTarget.MODS_FOLDER,
                     description=(
                         f"Import {len(members)} replace asset(s) into the mods copy of "
-                        f"{archive.name}; original untouched"
+                        f"{relative.as_posix()}; original untouched"
                     ),
                     archive_members=tuple(members),
                 )
@@ -224,6 +268,77 @@ class GtaVPlanBuilder:
                 )
             )
         return tuple(operations), tuple(restore_notes)
+
+    @classmethod
+    def _remap_imports_to_available_stock(
+        cls,
+        game_root: Path,
+        mods_path: Path,
+        *,
+        preferred: str,
+        members: list[ArchiveMemberImport],
+    ) -> tuple[dict[Path, list[ArchiveMemberImport]], str]:
+        """Retarget imports when the preferred DLC ``dlc.rpf`` is not on disk.
+
+        Modern GTA V often ships Turismo R inside a late ``patchday*`` pack
+        instead of legacy ``mpbusiness``. Fall back to that location, then to
+        classic ``mods/x64e.rpf`` overrides.
+        """
+        from gta_mod_manager.plugins.gta_v.rpf_archive import resolve_stock_members
+
+        remapped: dict[Path, list[ArchiveMemberImport]] = {}
+        probe_root = game_root / constants.VEHICLE_STREAM_ARCHIVE
+        used_sources: set[str] = set()
+        for member in members:
+            leaf = Path(member.member_path.replace("\\", "/")).name
+            probes = (
+                member.member_path.replace("\\", "/"),
+                f"{constants.VEHICLE_STREAM_NESTED_RPF}/{leaf}",
+                f"x64/{constants.VEHICLE_STREAM_NESTED_RPF}/{leaf}",
+            )
+            found = resolve_stock_members(probe_root, game_root, probes)
+            source = next((found[path] for path in probes if path in found), None)
+            if source is not None:
+                try:
+                    stock_relative = source.archive_path.resolve().relative_to(
+                        game_root.resolve()
+                    )
+                except ValueError:
+                    stock_relative = Path(source.archive_path.name)
+                target_archive = mods_path / stock_relative
+                nested = (source.nested_path or "").replace("\\", "/").strip("/")
+                new_member = f"{nested}/{source.leaf}" if nested else source.leaf
+                remapped.setdefault(target_archive, []).append(
+                    ArchiveMemberImport(
+                        source_path=member.source_path,
+                        member_path=new_member,
+                    )
+                )
+                used_sources.add(
+                    f"{source.archive_path.parent.name}/{source.archive_path.name}"
+                )
+                continue
+
+            # Last resort: OpenIV.asi override in mods/x64e.rpf.
+            fallback = mods_path / constants.VEHICLE_STREAM_ARCHIVE
+            remapped.setdefault(fallback, []).append(
+                ArchiveMemberImport(
+                    source_path=member.source_path,
+                    member_path=f"{constants.VEHICLE_STREAM_NESTED_RPF}/{leaf}",
+                )
+            )
+            used_sources.add(constants.VEHICLE_STREAM_ARCHIVE)
+
+        _LOGGER.warning(
+            "Preferred replace archive %s is missing; retargeted to %s",
+            preferred,
+            ", ".join(sorted(used_sources)) or "nowhere",
+        )
+        note = (
+            f"Preferred archive {preferred} is not in this game install; "
+            f"replace assets were retargeted to {', '.join(sorted(used_sources))}."
+        )
+        return remapped, note
 
     @staticmethod
     def _restore_safety_notes(
@@ -577,14 +692,15 @@ class GtaVPlanBuilder:
     def _oiv_operations(
         self, request: PlanRequest, oiv: object
     ) -> tuple[tuple[FileOperation, ...], tuple[ManualStep, ...], tuple[str, ...], int]:
-        """Turn an OIV descriptor's ``<add>`` commands into copy operations.
+        """Turn an OIV descriptor's ``<add>`` commands into copy / RPF imports.
 
-        Commands whose destination is a real folder (game root, ``scripts``,
-        ``mods``) are executed natively with the same backup/journal path as any
-        other file. Commands that write inside an ``.rpf`` still need OpenIV and
+        Loose destinations under the root whitelist still copy natively. OpenIV
+        virtual roots (``/common/data``, ``/dlc_patch/...``) are imported into
+        the matching ``mods/*.rpf`` archive. Remaining archive-only commands
         become a single manual step.
         """
         from gta_mod_manager.plugins.gta_v.oiv_package import OivPackage
+        from gta_mod_manager.plugins.gta_v.oiv_targets import resolve_openiv_virtual_path
 
         assert isinstance(oiv, OivPackage)
         content_root = oiv.content_root
@@ -595,6 +711,9 @@ class GtaVPlanBuilder:
         missing: list[str] = []
         not_whitelisted: list[str] = []
         skipped_root = 0
+        skipped_dlc_patch = 0
+        imports_by_archive: dict[Path, list[ArchiveMemberImport]] = {}
+
         for command in oiv.installable_commands:
             if command.source is None:
                 continue  # pragma: no cover - installable implies a source
@@ -603,32 +722,114 @@ class GtaVPlanBuilder:
                 missing.append(command.source.as_posix())
                 continue
             destination = command.destination
-            target = request.install.root_path / Path(*destination.parts)
-            first = destination.parts[0].lower() if destination.parts else ""
+            parts = [part for part in destination.parts if part and part != "/"]
+            relative_dest = PurePosixPath(*parts) if parts else PurePosixPath()
+            first = parts[0].lower() if parts else ""
+
             if first == constants.MODS_FOLDER_NAME:
-                target_kind = InstallTarget.MODS_FOLDER
-            else:
-                verdict = self._mapper.policy.evaluate(destination)
-                if not verdict.allowed:
-                    not_whitelisted.append(destination.as_posix())
+                target = request.install.root_path / Path(*parts)
+                if target.exists() and not request.overwrite_existing:
                     continue
+                action = FileAction.OVERWRITE if target.is_file() else FileAction.COPY
+                operations.append(
+                    FileOperation(
+                        action=action,
+                        target_path=target,
+                        source_path=source,
+                        target_kind=InstallTarget.MODS_FOLDER,
+                        description=(
+                            f"OpenIV package '{oiv.display_name}': install "
+                            f"{relative_dest.as_posix()}"
+                        ),
+                    )
+                )
+                continue
+
+            verdict = self._mapper.policy.evaluate(relative_dest)
+            if verdict.allowed:
                 if not request.allow_root_install:
                     skipped_root += 1
                     continue
+                target = request.install.root_path / Path(*parts)
+                if target.exists() and not request.overwrite_existing:
+                    continue
                 target_kind = verdict.target or InstallTarget.GAME_ROOT
-            if target.exists() and not request.overwrite_existing:
+                action = FileAction.OVERWRITE if target.is_file() else FileAction.COPY
+                operations.append(
+                    FileOperation(
+                        action=action,
+                        target_path=target,
+                        source_path=source,
+                        target_kind=target_kind,
+                        description=(
+                            f"OpenIV package '{oiv.display_name}': install "
+                            f"{relative_dest.as_posix()}"
+                        ),
+                    )
+                )
                 continue
-            action = FileAction.OVERWRITE if target.is_file() else FileAction.COPY
+
+            mapped = resolve_openiv_virtual_path(destination)
+            if mapped is None:
+                not_whitelisted.append(destination.as_posix())
+                continue
+            if mapped.is_dlc_patch:
+                # Mirroring every Rockstar DLC pack is huge; only patch packs
+                # that already have a mods copy (user already touched them).
+                mods_archive = request.install.mods_path / mapped.relative_archive
+                if not mods_archive.is_file():
+                    skipped_dlc_patch += 1
+                    continue
+            imports_by_archive.setdefault(
+                request.install.mods_path / mapped.relative_archive, []
+            ).append(
+                ArchiveMemberImport(
+                    source_path=source,
+                    member_path=mapped.member_path,
+                )
+            )
+
+        for archive, members in sorted(
+            imports_by_archive.items(), key=lambda item: str(item[0]).lower()
+        ):
+            relative = archive.relative_to(request.install.mods_path)
+            original = request.install.root_path / relative
+            if not archive.is_file():
+                parent = archive.parent
+                if not parent.is_dir():
+                    operations.append(
+                        FileOperation(
+                            action=FileAction.CREATE_DIRECTORY,
+                            target_path=parent,
+                            target_kind=InstallTarget.MODS_FOLDER,
+                            description=(
+                                f"Create {constants.MODS_FOLDER_NAME}/"
+                                f"{parent.relative_to(request.install.mods_path).as_posix()}"
+                            ),
+                        )
+                    )
+                operations.append(
+                    FileOperation(
+                        action=FileAction.RPF_COPY,
+                        target_path=archive,
+                        source_path=original,
+                        target_kind=InstallTarget.MODS_FOLDER,
+                        description=(
+                            f"Copy {relative.as_posix()} into {constants.MODS_FOLDER_NAME}/ "
+                            "(original stays read-only)"
+                        ),
+                    )
+                )
             operations.append(
                 FileOperation(
-                    action=action,
-                    target_path=target,
-                    source_path=source,
-                    target_kind=target_kind,
+                    action=FileAction.RPF_IMPORT,
+                    target_path=archive,
+                    target_kind=InstallTarget.MODS_FOLDER,
                     description=(
-                        f"OpenIV package '{oiv.display_name}': install "
-                        f"{destination.as_posix()}"
+                        f"OpenIV package '{oiv.display_name}': import {len(members)} "
+                        f"file(s) into mods/{relative.as_posix()}"
                     ),
+                    archive_members=tuple(members),
                 )
             )
 
@@ -639,14 +840,21 @@ class GtaVPlanBuilder:
         notes: list[str] = []
         if operations:
             notes.append(
-                f"OpenIV package '{oiv.display_name}': {len(operations)} file(s) "
-                "installed automatically (game root / scripts / mods)."
+                f"OpenIV package '{oiv.display_name}': {len(operations)} operation(s) "
+                "prepared (game root / scripts / mods RPF imports)."
             )
         if missing:
             preview = ", ".join(missing[:4]) + (", ..." if len(missing) > 4 else "")
             notes.append(
                 f"OpenIV package '{oiv.display_name}': {len(missing)} declared file(s) "
                 f"were missing from the package and skipped ({preview})."
+            )
+        if skipped_dlc_patch:
+            notes.append(
+                f"OpenIV package '{oiv.display_name}': skipped {skipped_dlc_patch} DLC "
+                "handling patch(es) for packs not already mirrored under mods/ "
+                "(base-game handling still installs). For full DLC coverage, run "
+                "Install.oiv once in OpenIV Package Installer."
             )
         if not_whitelisted:
             preview = ", ".join(not_whitelisted[:4]) + (

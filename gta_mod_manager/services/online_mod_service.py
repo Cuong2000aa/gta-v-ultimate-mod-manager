@@ -150,8 +150,8 @@ class OnlineModService:
 
     def _execute_plan(self, plan: OnlineDownloadPlan) -> Result[OnlineDownloadResult]:
         if plan.mode is DownloadMode.OPEN_BROWSER:
-            target = plan.listing.page_url
-            if plan.listing.source is OnlineSource.NEXUS:
+            target = plan.download_url or plan.listing.page_url
+            if plan.listing.source is OnlineSource.NEXUS and not plan.download_url:
                 target = f"{plan.listing.page_url}?tab=files"
             webbrowser.open(target)
             return Result.ok(
@@ -186,10 +186,16 @@ class OnlineModService:
                 label = f"{label} ({max(written, 0) // (1024 * 1024)} MB)"
             self._progress.advance("online.download", written, label)
 
+        headers: dict[str, str] | None = None
+        if "files.gta5-mods.com" in plan.download_url.lower():
+            referer = plan.listing.page_url or constants.GTA5MODS_SITE_BASE
+            headers = {"Referer": referer}
+
         try:
             path = http_client.download_file(
                 plan.download_url,
                 destination,
+                headers=headers,
                 on_progress=on_progress,
             )
         except RuntimeError as error:

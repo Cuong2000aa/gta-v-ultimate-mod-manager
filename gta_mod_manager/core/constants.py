@@ -311,7 +311,12 @@ NEXUS_API_BASE: Final[str] = "https://api.nexusmods.com/v1"
 NEXUS_GAME_DOMAIN_GTA_V: Final[str] = "gta5"
 NEXUS_SITE_BASE: Final[str] = "https://www.nexusmods.com/gta5"
 GTA5MODS_SITE_BASE: Final[str] = "https://www.gta5-mods.com"
-ONLINE_USER_AGENT: Final[str] = f"{APP_SLUG}/{APP_VERSION}"
+#: Browser-like UA — GTA5-Mods / Cloudflare often block bare app identifiers.
+ONLINE_USER_AGENT: Final[str] = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) "
+    f"Chrome/122.0.0.0 Safari/537.36 {APP_SLUG}/{APP_VERSION}"
+)
 ARCHIVE_DOWNLOAD_EXTENSIONS: Final[frozenset[str]] = frozenset(
     {".zip", ".rar", ".7z", ".oiv"}
 )
